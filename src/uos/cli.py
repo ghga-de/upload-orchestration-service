@@ -13,21 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Entrypoint of the package."""
+"""Entrypoint of the package"""
 
 import asyncio
 
-from ghga_service_commons.api import run_server
+import typer
 
-from .api.main import app  # noqa: F401 pylint: disable=unused-import
-from .config import CONFIG, Config
+from uos.main import consume_events, run_rest_app
 
-
-def run(config: Config = CONFIG):
-    """Run the service."""
-    # Please adapt to package name
-    asyncio.run(run_server(app="my_microservice.__main__:app", config=config))
+cli = typer.Typer()
 
 
-if __name__ == "__main__":
-    run()
+@cli.command(name="run-rest")
+def sync_run_api():
+    """Run the HTTP REST API."""
+    asyncio.run(run_rest_app())
+
+
+@cli.command(name="consume-events")
+def sync_consume_events(run_forever: bool = True):
+    """Run an event consumer listening to the specified topic."""
+    asyncio.run(consume_events(run_forever=run_forever))

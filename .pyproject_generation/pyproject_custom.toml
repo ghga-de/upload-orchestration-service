@@ -1,19 +1,16 @@
 [project]
-# please adapt to package name
-name = "my_microservice"
+name = "uos"
 version = "0.1.0"
-description = "My-Microservice - a short description"
+description = "Upload Orchestration Service - A service providing a web-accessible management and auth layer over upload-path file services."
 dependencies = [
     "typer >= 0.15",
-    "ghga-service-commons[api] >= 4.0",
-    "ghga-event-schemas >= 6.0",
-    "hexkit[akafka,s3,mongodb] >= 4.5",
+    "ghga-service-commons[api] >= 4.2",
+    "ghga-event-schemas ~= 10.0",
+    "hexkit[akafka,mongodb,opentelemetry] >= 7.0",
 ]
 
 [project.urls]
-# please adapt to package name
-Repository = "https://github.com/ghga-de/my-microservice"
+Repository = "https://github.com/ghga-de/upload-orchestration-service"
 
 [project.scripts]
-# please adapt to package name
-my-microservice = "my_microservice.__main__:run"
+uos = "uos.__main__:cli"

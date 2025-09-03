@@ -16,8 +16,8 @@
 
 """Used to define the location of the main FastAPI app object."""
 
-# flake8: noqa
-# pylint: skip-file
+from uos.adapters.inbound.fastapi_.configure import get_configured_app
+from uos.config import Config
 
-# Please adapt to package structure:
-from my_microservice.api.main import app
+config = Config()  # type: ignore
+app = get_configured_app(config=config)

@@ -13,11 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""FastAPI dependencies (used with the `Depends` feature)."""
+"""Service-wide constants"""
 
-from ..config import CONFIG
+from opentelemetry import trace
 
-
-def get_config():
-    """Get runtime configuration."""
-    return CONFIG
+SERVICE_NAME = "uos"
+TRACER = trace.get_tracer_provider().get_tracer(SERVICE_NAME)

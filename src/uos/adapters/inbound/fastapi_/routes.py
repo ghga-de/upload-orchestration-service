@@ -13,12 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test dummy."""
+"""FastAPI endpoints for UOS interaction"""
 
-from uos.core.greeting import generate_greeting
+from fastapi import APIRouter
+
+from uos.constants import TRACER
+
+router = APIRouter()
 
 
-def test_dummy():
-    """A very simple example test."""
-    greeting = generate_greeting("monde", "French", True)
-    assert greeting.message == "Salut monde!"
+@router.get(
+    "/health",
+    summary="health",
+    tags=["UploadOrchestrationService"],
+    status_code=200,
+)
+@TRACER.start_as_current_span("routes.health")
+async def health():
+    """Used to test if this service is alive"""
+    return {"status": "OK"}

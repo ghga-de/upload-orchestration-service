@@ -13,12 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test dummy."""
+"""Entrypoint of the package."""
 
-from uos.core.greeting import generate_greeting
+from uos.cli import cli
 
-
-def test_dummy():
-    """A very simple example test."""
-    greeting = generate_greeting("monde", "French", True)
-    assert greeting.message == "Salut monde!"
+if __name__ == "__main__":
+    cli()
