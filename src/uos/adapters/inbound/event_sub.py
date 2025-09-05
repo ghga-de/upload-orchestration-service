@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 # TODO: Move this config to ghga-event-schemas
 class FileUploadBoxConfig(BaseSettings):
     """Config for events communicating changes in FileUploadBoxes
-    
+
     The event types are hardcoded by `hexkit`.
     """
 

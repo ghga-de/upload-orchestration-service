@@ -43,7 +43,10 @@ class ClaimsClientPort(ABC):
 
 
 class UCSClientPort(ABC):
-    """An adapter for interacting with the UCS"""
+    """An adapter for interacting with the UCS.
+
+    This class is responsible for WOT generation and all pertinent error handling.
+    """
 
     @abstractmethod
     async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:

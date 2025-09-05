@@ -89,7 +89,10 @@ class ClaimsClient(ClaimsClientPort):
 
 
 class UCSClient(UCSClientPort):
-    """An adapter for communicating with the Upload Controller Service"""
+    """An adapter for interacting with the UCS.
+
+    This class is responsible for WOT generation and all pertinent error handling.
+    """
 
     def __init__(self, *, config: UCSApiConfig):
         self._ucs_url = config.ucs_url

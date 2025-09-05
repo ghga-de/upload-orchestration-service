@@ -30,7 +30,7 @@ from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
 __all__ = [
     "AuthProviderDummy",
-    "WorkPackageRepositoryDummy",
+    "UploadOrchestratorDummy",
     "auth_provider",
     "upload_orchestrator_port",
 ]
@@ -39,6 +39,6 @@ auth_provider = DependencyDummy("auth_provider")
 upload_orchestrator_port = DependencyDummy("work_package_repo_port")
 
 AuthProviderDummy = Annotated[AuthContextProtocol[AuthContext], Depends(auth_provider)]
-WorkPackageRepositoryDummy = Annotated[
+UploadOrchestratorDummy = Annotated[
     UploadOrchestratorPort, Depends(upload_orchestrator_port)
 ]

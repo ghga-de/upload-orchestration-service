@@ -164,6 +164,8 @@ class UpdateUploadBoxRequest(BaseModel):
 class GrantAccessRequest(BaseModel):
     """Request model for granting upload access to a user."""
 
+    # TODO: Add any other fields here that might be needed. Look at CRS for format
+
     user_id: UUID4 = Field(..., description="ID of the user to grant access to")
     iva_id: UUID4 = Field(..., description="ID of the IVA verification")
     box_id: UUID4 = Field(..., description="ID of the upload box")
