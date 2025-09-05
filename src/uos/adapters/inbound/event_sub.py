@@ -15,6 +15,8 @@
 
 """Inbound adapter for event subscription"""
 
+import logging
+
 from hexkit.protocols.daosub import DaoSubscriberProtocol
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -22,9 +24,16 @@ from pydantic_settings import BaseSettings
 from uos.core.models import FileUploadBox
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
+log = logging.getLogger(__name__)
+
 
 # TODO: Move this config to ghga-event-schemas
 class FileUploadBoxConfig(BaseSettings):
+    """Config for events communicating changes in FileUploadBoxes
+    
+    The event types are hardcoded by `hexkit`.
+    """
+
     file_upload_box_topic: str = Field(
         ...,
         description="Topic containing published FileUploadBox outbox events",
@@ -51,4 +60,10 @@ class OutboxSubTranslator(DaoSubscriberProtocol):
 
     async def changed(self, resource_id: str, update: FileUploadBox) -> None:
         """Consume an upserted FileUploadBox and update its parent ResearchDataUploadBox"""
-        await self._upload_orchestrator.update_upload_box(file_upload_box=update)
+        await self._upload_orchestrator.upsert_file_upload_box(file_upload_box=update)
+
+    async def deleted(self, resource_id: str) -> None:
+        """Consume a deleted FileUploadBox event and remove from own storage"""
+        log.warning(
+            "Encountered 'deleted' event for FileUploadBox %s. Ignoring.", resource_id
+        )
