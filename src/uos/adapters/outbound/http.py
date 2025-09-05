@@ -15,14 +15,25 @@
 
 """Outbound HTTP calls"""
 
+import logging
 from collections.abc import Sequence
 
-from pydantic import UUID4, Field
+from ghga_service_commons.utils.crypt import encrypt
+from jwcrypto import jwk
+from pydantic import UUID4, Field, SecretStr
 from pydantic_settings import BaseSettings
 
+from uos.core.models import (
+    ChangeFileBoxWorkOrder,
+    CreateFileBoxWorkOrder,
+    ViewFileBoxWorkOrder,
+)
+from uos.core.tokens import sign_work_order_token
 from uos.ports.outbound.http import ClaimsClientPort, UCSClientPort
 
 TIMEOUT = 60
+
+log = logging.getLogger(__name__)
 
 
 class AccessApiConfig(BaseSettings):
@@ -44,6 +55,16 @@ class UCSApiConfig(BaseSettings):
         description="URL pointing to the UCS API.",
         examples=["http://127.0.0.1/upload"],
     )
+    work_order_signing_key: SecretStr = Field(
+        ...,
+        description="The private key for signing work order tokens",
+        examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
+    )
+    ucs_public_key: str = Field(
+        ...,
+        description="The public key used to encrypt work order tokens sent to the UCS",
+        examples=[],  # TODO: fill in this and check the type-hint
+    )
 
 
 class ClaimsClient(ClaimsClientPort):
@@ -56,33 +77,56 @@ class ClaimsClient(ClaimsClientPort):
         self, *, user_id: UUID4, iva_id: UUID4, box_id: UUID4
     ) -> None:
         """Grant upload access to a user for a box."""
+        raise NotImplementedError()
 
-    async def get_accessible_upload_boxes(self, user_id: str) -> Sequence[UUID4]:
+    async def get_accessible_upload_boxes(self, user_id: UUID4) -> Sequence[UUID4]:
         """Get list of upload box IDs accessible to a user."""
+        raise NotImplementedError()
+
+    async def check_box_access(self, *, user_id: UUID4, box_id: UUID4) -> bool:
+        """Check if a user has access to a specific upload box."""
+        raise NotImplementedError()
 
 
 class UCSClient(UCSClientPort):
     """An adapter for communicating with the Upload Controller Service"""
 
     def __init__(self, *, config: UCSApiConfig):
-        self.ucs_url = config.ucs_url
+        self._ucs_url = config.ucs_url
+        self._ucs_public_key = config.ucs_public_key
+        self._signing_key = jwk.JWK.from_json(
+            config.work_order_signing_key.get_secret_value()
+        )
+        if not self._signing_key.has_private:
+            key_error = KeyError("No private work order signing key found.")
+            log.error(key_error)
+            raise key_error
 
-    async def create_file_upload_box(
-        self, *, storage_alias: str, work_order: str
-    ) -> UUID4:
+    async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
         """Create a new FileUploadBox in UCS."""
-        pass
+        signed_wot = sign_work_order_token(CreateFileBoxWorkOrder(), self._signing_key)
+        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
+        raise NotImplementedError()
 
-    async def lock_file_upload_box(self, *, box_id: UUID4, work_order: str) -> None:
+    async def lock_file_upload_box(self, *, box_id: UUID4, signing_key: str) -> None:
         """Lock a FileUploadBox in UCS."""
-        pass
+        wot = ChangeFileBoxWorkOrder(work_type="lock", box_id=box_id)
+        signed_wot = sign_work_order_token(wot, self._signing_key)
+        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
+        raise NotImplementedError()
 
-    async def unlock_file_upload_box(self, *, box_id: UUID4, work_order: str) -> None:
+    async def unlock_file_upload_box(self, *, box_id: UUID4, signing_key: str) -> None:
         """Unlock a FileUploadBox in UCS."""
-        pass
+        wot = ChangeFileBoxWorkOrder(work_type="unlock", box_id=box_id)
+        signed_wot = sign_work_order_token(wot, self._signing_key)
+        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
+        raise NotImplementedError()
 
     async def get_file_upload_list(
-        self, *, box_id: UUID4, work_order: str
+        self, *, box_id: UUID4, signing_key: str
     ) -> Sequence[str]:
         """Get list of file IDs in a FileUploadBox."""
-        pass
+        wot = ViewFileBoxWorkOrder(box_id=box_id)
+        signed_wot = sign_work_order_token(wot, self._signing_key)
+        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
+        raise NotImplementedError()

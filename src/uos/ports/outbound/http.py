@@ -32,8 +32,13 @@ class ClaimsClientPort(ABC):
         ...
 
     @abstractmethod
-    async def get_accessible_upload_boxes(self, user_id: str) -> Sequence[UUID4]:
+    async def get_accessible_upload_boxes(self, user_id: UUID4) -> Sequence[UUID4]:
         """Get list of upload box IDs accessible to a user."""
+        ...
+
+    @abstractmethod
+    async def check_box_access(self, *, user_id: UUID4, box_id: UUID4) -> bool:
+        """Check if a user has access to a specific upload box."""
         ...
 
 
@@ -41,25 +46,21 @@ class UCSClientPort(ABC):
     """An adapter for interacting with the UCS"""
 
     @abstractmethod
-    async def create_file_upload_box(
-        self, *, storage_alias: str, work_order: str
-    ) -> UUID4:
+    async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
         """Create a new FileUploadBox in UCS."""
         ...
 
     @abstractmethod
-    async def lock_file_upload_box(self, *, box_id: UUID4, work_order: str) -> None:
+    async def lock_file_upload_box(self, *, box_id: UUID4) -> None:
         """Lock a FileUploadBox in UCS."""
         ...
 
     @abstractmethod
-    async def unlock_file_upload_box(self, *, box_id: UUID4, work_order: str) -> None:
+    async def unlock_file_upload_box(self, *, box_id: UUID4) -> None:
         """Unlock a FileUploadBox in UCS."""
         ...
 
     @abstractmethod
-    async def get_file_upload_list(
-        self, *, box_id: UUID4, work_order: str
-    ) -> Sequence[str]:
+    async def get_file_upload_list(self, *, box_id: UUID4) -> Sequence[str]:
         """Get list of file IDs in a FileUploadBox."""
         ...
