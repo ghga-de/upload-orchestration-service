@@ -25,7 +25,6 @@ from uos.core.models import (
     CreateUploadBoxRequest,
     FileUploadBox,
     GrantAccessRequest,
-    ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
 
@@ -34,7 +33,7 @@ class UploadOrchestratorPort(ABC):
     """Port for the Upload Orchestrator service."""
 
     @abstractmethod
-    async def create_upload_box(
+    async def create_research_data_upload_box(
         self,
         request: CreateUploadBoxRequest,
         user_id: str,
@@ -49,7 +48,6 @@ class UploadOrchestratorPort(ABC):
         Args:
             request: The upload box creation request
             user_id: ID of the user creating the box
-            correlation_id: Correlation ID for tracing
 
         Returns:
             The UUID of the newly created upload box
@@ -57,7 +55,7 @@ class UploadOrchestratorPort(ABC):
         ...
 
     @abstractmethod
-    async def update_upload_box(
+    async def update_research_data_upload_box(
         self,
         box_id: UUID4,
         request: UpdateUploadBoxRequest,
@@ -69,7 +67,6 @@ class UploadOrchestratorPort(ABC):
             box_id: The UUID of the upload box to update
             request: The update request containing changes
             user_id: ID of the user making the update
-            correlation_id: Correlation ID for tracing
 
         Raises:
             UploadBoxNotFoundError: If the box doesn't exist
@@ -87,7 +84,6 @@ class UploadOrchestratorPort(ABC):
         Args:
             request: The access grant request
             granting_user_id: ID of the user granting access (must be Data Steward)
-            correlation_id: Correlation ID for tracing
 
         Raises:
             UploadBoxNotFoundError: If the box doesn't exist
@@ -104,7 +100,7 @@ class UploadOrchestratorPort(ABC):
         """Get list of file IDs for an upload box.
 
         Args:
-            box_id: The UUID of the upload box
+            box_id: The UUID of the research data upload box
             user_id: ID of the user requesting the list
             is_data_steward: Whether the user has Data Steward role
 

@@ -88,7 +88,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         self._ucs_client = ucs_client
         self._claims_client = claims_client
 
-    async def create_upload_box(
+    async def create_research_data_upload_box(
         self,
         request: CreateUploadBoxRequest,
         user_id: UUID4,
@@ -124,12 +124,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
         await self._audit_repository.log_box_created(box=box, user_id=user_id)
         return box.id
 
-    async def update_upload_box(
+    async def update_research_data_upload_box(
         self,
         box_id: UUID4,
         request: UpdateUploadBoxRequest,
         user_id: UUID4,
-    ) -> ResearchDataUploadBox:
+    ) -> None:
         """Update a research data upload box."""
         # Get existing box
         box = await self._box_dao.get_by_id(box_id)
@@ -196,7 +196,6 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Create audit record
         await self._audit_repository.log_box_updated(box=box, user_id=user_id)
-        return box
 
     async def grant_upload_access(
         self,
