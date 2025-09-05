@@ -12,13 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Event publisher port definition"""
 
-"""Service-wide constants"""
+from abc import ABC, abstractmethod
 
-from opentelemetry import trace
+from uos.core.models import AuditRecord
 
-SERVICE_NAME = "uos"
-TRACER = trace.get_tracer_provider().get_tracer(SERVICE_NAME)
-BOX_COLLECTION = "boxes"
-AUDIT_COLLECTION = "auditLogs"
-WORK_ORDER_TOKEN_VALID_SECONDS = 30
+__all__ = ["EventPublisherPort"]
+
+
+class EventPublisherPort(ABC):
+    """Port for publishing events."""
+
+    @abstractmethod
+    async def publish_audit_record(self, audit_record: AuditRecord) -> None:
+        """Publish an audit record event"""

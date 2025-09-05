@@ -1,0 +1,54 @@
+# Copyright 2021 - 2025 Universität Tübingen, DKFZ, EMBL, and Universität zu Köln
+# for the German Human Genome-Phenome Archive (GHGA)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Inbound adapter for event subscription"""
+
+from hexkit.protocols.daosub import DaoSubscriberProtocol
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
+from uos.core.models import FileUploadBox
+from uos.ports.inbound.orchestrator import UploadOrchestratorPort
+
+
+# TODO: Move this config to ghga-event-schemas
+class FileUploadBoxConfig(BaseSettings):
+    file_upload_box_topic: str = Field(
+        ...,
+        description="Topic containing published FileUploadBox outbox events",
+        examples=["file-upload-boxes", "file-upload-box-topic"],
+    )
+
+
+class OutboxSubConfig(FileUploadBoxConfig):
+    """Configuration for subscribing to outbox events"""
+
+
+class OutboxSubTranslator(DaoSubscriberProtocol):
+    """Subscriber that translates inbound FileUploadBox outbox events"""
+
+    event_topic: str
+    dto_model = FileUploadBox
+
+    def __init__(
+        self, config: OutboxSubConfig, upload_orchestrator: UploadOrchestratorPort
+    ):
+        """Configure the class instance"""
+        self.event_topic = config.file_upload_box_topic
+        self._upload_orchestrator = upload_orchestrator
+
+    async def changed(self, resource_id: str, update: FileUploadBox) -> None:
+        """Consume an upserted FileUploadBox and update its parent ResearchDataUploadBox"""
+        await self._upload_orchestrator.update_upload_box(file_upload_box=update)

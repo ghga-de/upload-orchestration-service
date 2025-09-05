@@ -16,13 +16,16 @@
 """Config Parameter Modeling and Parsing."""
 
 from ghga_service_commons.api import ApiConfigBase
+from ghga_service_commons.auth.ghga import AuthConfig
 from hexkit.config import config_from_yaml
 from hexkit.log import LoggingConfig
 from hexkit.opentelemetry import OpenTelemetryConfig
-from hexkit.providers.akafka import KafkaConfig
-from hexkit.providers.mongodb import MongoDbConfig
+from hexkit.providers.mongokafka import MongoKafkaConfig
 
+from uos.adapters.outbound.event_pub import EventPubConfig
+from uos.adapters.outbound.http import AccessApiConfig, UCSApiConfig
 from uos.constants import SERVICE_NAME
+from uos.core.orchestrator import UploadOrchestratorConfig
 
 __all__ = ["Config"]
 
@@ -30,10 +33,14 @@ __all__ = ["Config"]
 @config_from_yaml(prefix=SERVICE_NAME)
 class Config(
     ApiConfigBase,
+    AuthConfig,
     LoggingConfig,
     OpenTelemetryConfig,
-    MongoDbConfig,
-    KafkaConfig,
+    MongoKafkaConfig,
+    AccessApiConfig,
+    UCSApiConfig,
+    EventPubConfig,
+    UploadOrchestratorConfig,
 ):
     """Config parameters and their defaults."""
 

@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Service-wide constants"""
+"""DAO Port definition"""
 
-from opentelemetry import trace
+from hexkit.protocols.dao import Dao
 
-SERVICE_NAME = "uos"
-TRACER = trace.get_tracer_provider().get_tracer(SERVICE_NAME)
-BOX_COLLECTION = "boxes"
-AUDIT_COLLECTION = "auditLogs"
-WORK_ORDER_TOKEN_VALID_SECONDS = 30
+from uos.core.models import ResearchDataUploadBox
+
+__all__ = ["BoxDao"]
+
+BoxDao = Dao[ResearchDataUploadBox]

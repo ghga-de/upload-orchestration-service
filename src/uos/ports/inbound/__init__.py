@@ -13,12 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Service-wide constants"""
-
-from opentelemetry import trace
-
-SERVICE_NAME = "uos"
-TRACER = trace.get_tracer_provider().get_tracer(SERVICE_NAME)
-BOX_COLLECTION = "boxes"
-AUDIT_COLLECTION = "auditLogs"
-WORK_ORDER_TOKEN_VALID_SECONDS = 30
+"""Inbound port definitions"""

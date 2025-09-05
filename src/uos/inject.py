@@ -1,0 +1,145 @@
+# Copyright 2021 - 2025 Universität Tübingen, DKFZ, EMBL, and Universität zu Köln
+# for the German Human Genome-Phenome Archive (GHGA)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Dependency injection and setup of main components"""
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager, nullcontext
+
+from fastapi import FastAPI
+from ghga_service_commons.auth.ghga import AuthContext, GHGAAuthContextProvider
+
+# from hexkit.providers.akafka.provider import KafkaEventPublisher, KafkaEventSubscriber
+from hexkit.providers.mongodb import MongoDbDaoFactory
+from hexkit.providers.mongokafka import PersistentKafkaPublisher
+
+from uos.adapters.inbound.fastapi_ import dummies
+from uos.adapters.inbound.fastapi_.configure import get_configured_app
+from uos.adapters.outbound.audit import AuditRepository
+from uos.adapters.outbound.dao import get_box_dao
+from uos.adapters.outbound.event_pub import EventPubTranslator
+from uos.adapters.outbound.http import ClaimsClient, UCSClient
+from uos.config import Config
+from uos.constants import SERVICE_NAME
+from uos.core.orchestrator import UploadOrchestrator
+from uos.ports.inbound.orchestrator import UploadOrchestratorPort
+from uos.ports.outbound.audit import AuditRepositoryPort
+from uos.ports.outbound.dao import BoxDao
+from uos.ports.outbound.http import ClaimsClientPort, UCSClientPort
+
+__all__ = [
+    "prepare_core",
+    "prepare_event_subscriber",
+    "prepare_rest_app",
+]
+
+
+@asynccontextmanager
+async def get_persistent_publisher(
+    config: Config, dao_factory: MongoDbDaoFactory | None = None
+) -> AsyncGenerator[PersistentKafkaPublisher, None]:
+    """Construct and return a PersistentKafkaPublisher."""
+    async with (
+        (  # use provided factory if supplied or create new one
+            nullcontext(dao_factory)
+            if dao_factory
+            else MongoDbDaoFactory.construct(config=config)
+        ) as _dao_factory,
+        PersistentKafkaPublisher.construct(
+            config=config,
+            dao_factory=_dao_factory,
+            collection_name="uosPersistedEvents",
+        ) as persistent_publisher,
+    ):
+        yield persistent_publisher
+
+
+@asynccontextmanager
+async def prepare_core(
+    *,
+    config: Config,
+    box_dao_override: BoxDao | None = None,
+    audit_repo_override: AuditRepositoryPort | None = None,
+    ucs_client_override: UCSClientPort | None = None,
+    claims_client_override: ClaimsClientPort | None = None,
+) -> AsyncGenerator[UploadOrchestratorPort, None]:
+    """Constructs and initializes all core components and their outbound dependencies.
+
+    The _override parameters can be used to override the default dependencies.
+    """
+    async with (
+        MongoDbDaoFactory.construct(config=config) as dao_factory,
+        get_persistent_publisher(
+            config=config, dao_factory=dao_factory
+        ) as persistent_pub_provider,
+    ):
+        event_publisher = EventPubTranslator(
+            config=config, provider=persistent_pub_provider
+        )
+        audit_repository = audit_repo_override or AuditRepository(
+            service=SERVICE_NAME, event_publisher=event_publisher
+        )
+        box_dao = await get_box_dao(dao_factory=dao_factory, override=box_dao_override)
+        claims_client = claims_client_override or ClaimsClient(config=config)
+        ucs_client = ucs_client_override or UCSClient(config=config)
+
+        yield UploadOrchestrator(
+            config=config,
+            box_dao=box_dao,
+            audit_repository=audit_repository,
+            claims_client=claims_client,
+            ucs_client=ucs_client,
+        )
+
+
+def prepare_core_with_override(
+    *,
+    config: Config,
+    upload_orchestrator_override: UploadOrchestratorPort | None = None,
+):
+    """Resolve the reverse_transpiler context manager based on config and override (if any)."""
+    return (
+        nullcontext(upload_orchestrator_override)
+        if upload_orchestrator_override
+        else prepare_core(config=config)
+    )
+
+
+@asynccontextmanager
+async def prepare_rest_app(
+    *,
+    config: Config,
+    upload_orchestrator_override: UploadOrchestratorPort | None = None,
+) -> AsyncGenerator[FastAPI, None]:
+    """Construct and initialize an REST API app along with all its dependencies.
+    By default, the core dependencies are automatically prepared but you can also
+    provide them using the override parameter.
+    """
+    app = get_configured_app(config=config)
+
+    async with (
+        prepare_core_with_override(
+            config=config, upload_orchestrator_override=upload_orchestrator_override
+        ) as reverse_transpiler,
+        GHGAAuthContextProvider.construct(
+            config=config,
+            context_class=AuthContext,
+        ) as auth_context,
+    ):
+        app.dependency_overrides[dummies.auth_provider] = lambda: auth_context
+        app.dependency_overrides[dummies.upload_orchestrator_port] = (
+            lambda: reverse_transpiler
+        )
+        yield app

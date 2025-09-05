@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Upload Orchestration Service - A service providing a web-accessible management and auth layer over upload-path file services."
 dependencies = [
     "typer >= 0.15",
-    "ghga-service-commons[api] >= 4.2",
+    "ghga-service-commons[api,auth,crypt] >= 4.2",
     "ghga-event-schemas ~= 10.0",
     "hexkit[akafka,mongodb,opentelemetry] >= 7.0",
 ]
