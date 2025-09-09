@@ -10,3 +10,4 @@ audit_record_topic: audit-records
 audit_record_type: audit_record_logged
 ucs_public_key: dWoWghAEVPcpHILEb5drJx59nF+of6YKuAOhKRpmegY=
 work_order_signing_key: "{}"
+file_upload_box_topic: file-upload-boxes

@@ -52,7 +52,7 @@ class OutboxSubTranslator(DaoSubscriberProtocol):
     dto_model = FileUploadBox
 
     def __init__(
-        self, config: OutboxSubConfig, upload_orchestrator: UploadOrchestratorPort
+        self, *, config: OutboxSubConfig, upload_orchestrator: UploadOrchestratorPort
     ):
         """Configure the class instance"""
         self.event_topic = config.file_upload_box_topic

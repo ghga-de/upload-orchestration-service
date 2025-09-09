@@ -22,6 +22,7 @@ from hexkit.log import LoggingConfig
 from hexkit.opentelemetry import OpenTelemetryConfig
 from hexkit.providers.mongokafka import MongoKafkaConfig
 
+from uos.adapters.inbound.event_sub import OutboxSubConfig
 from uos.adapters.outbound.event_pub import EventPubConfig
 from uos.adapters.outbound.http import AccessApiConfig, UCSApiConfig
 from uos.constants import SERVICE_NAME
@@ -39,6 +40,7 @@ class Config(
     AccessApiConfig,
     UCSApiConfig,
     EventPubConfig,
+    OutboxSubConfig,
 ):
     """Config parameters and their defaults."""
 

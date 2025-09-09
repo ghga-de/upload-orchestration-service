@@ -20,24 +20,28 @@ from contextlib import asynccontextmanager, nullcontext
 
 from fastapi import FastAPI
 from ghga_service_commons.auth.ghga import AuthContext, GHGAAuthContextProvider
-
-# from hexkit.providers.akafka.provider import KafkaEventPublisher, KafkaEventSubscriber
+from hexkit.providers.akafka.provider import (
+    ComboTranslator,
+    KafkaEventPublisher,
+    KafkaEventSubscriber,
+)
 from hexkit.providers.mongodb import MongoDbDaoFactory
 from hexkit.providers.mongokafka import PersistentKafkaPublisher
 
+from uos.adapters.inbound.event_sub import OutboxSubTranslator
 from uos.adapters.inbound.fastapi_ import dummies
 from uos.adapters.inbound.fastapi_.configure import get_configured_app
 from uos.adapters.outbound.audit import AuditRepository
 from uos.adapters.outbound.dao import get_box_dao
 from uos.adapters.outbound.event_pub import EventPubTranslator
-from uos.adapters.outbound.http import ClaimsClient, UCSClient
+from uos.adapters.outbound.http import AccessClient, UCSClient
 from uos.config import Config
 from uos.constants import SERVICE_NAME
 from uos.core.orchestrator import UploadOrchestrator
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.audit import AuditRepositoryPort
 from uos.ports.outbound.dao import BoxDao
-from uos.ports.outbound.http import ClaimsClientPort, UCSClientPort
+from uos.ports.outbound.http import AccessClientPort, UCSClientPort
 
 __all__ = [
     "prepare_core",
@@ -73,7 +77,7 @@ async def prepare_core(
     box_dao_override: BoxDao | None = None,
     audit_repo_override: AuditRepositoryPort | None = None,
     ucs_client_override: UCSClientPort | None = None,
-    claims_client_override: ClaimsClientPort | None = None,
+    claims_client_override: AccessClientPort | None = None,
 ) -> AsyncGenerator[UploadOrchestratorPort, None]:
     """Constructs and initializes all core components and their outbound dependencies.
 
@@ -92,11 +96,10 @@ async def prepare_core(
             service=SERVICE_NAME, event_publisher=event_publisher
         )
         box_dao = await get_box_dao(dao_factory=dao_factory, override=box_dao_override)
-        claims_client = claims_client_override or ClaimsClient(config=config)
+        claims_client = claims_client_override or AccessClient(config=config)
         ucs_client = ucs_client_override or UCSClient(config=config)
 
         yield UploadOrchestrator(
-            config=config,
             box_dao=box_dao,
             audit_repository=audit_repository,
             claims_client=claims_client,
@@ -143,3 +146,30 @@ async def prepare_rest_app(
             lambda: reverse_transpiler
         )
         yield app
+
+
+@asynccontextmanager
+async def prepare_event_subscriber(
+    *,
+    config: Config,
+    upload_orchestrator_override: UploadOrchestratorPort | None = None,
+) -> AsyncGenerator[KafkaEventSubscriber, None]:
+    """Construct and initialize an event subscriber with all its dependencies.
+    By default, the core dependencies are automatically prepared but you can also
+    provide them using the override parameter.
+    """
+    async with (
+        prepare_core_with_override(
+            config=config, upload_orchestrator_override=upload_orchestrator_override
+        ) as upload_orchestrator,
+        KafkaEventPublisher.construct(config=config) as dlq_publisher,
+    ):
+        outbox_translator = OutboxSubTranslator(
+            config=config, upload_orchestrator=upload_orchestrator
+        )
+        translator = ComboTranslator(translators=[outbox_translator])
+
+        async with KafkaEventSubscriber.construct(
+            config=config, translator=translator, dlq_publisher=dlq_publisher
+        ) as event_subscriber:
+            yield event_subscriber

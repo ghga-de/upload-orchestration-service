@@ -20,29 +20,11 @@ Additional endpoints might be structured in dedicated modules
 (each of them having a sub-router).
 """
 
-from contextlib import nullcontext
-
-# from ghga_service_commons.api import run_server
+from ghga_service_commons.api import run_server
 from hexkit.log import configure_logging
 
 from uos.config import Config
-
-
-# from uos.inject import prepare_event_subscriber, prepare_rest_app
-async def run_server(app, config):
-    """Pass"""
-    raise NotImplementedError()
-
-
-class Placeholder:
-    """Pass"""
-
-    async def run(self, *, forever) -> None:
-        """Pass"""
-        raise NotImplementedError()
-
-
-prepare_event_subscriber = prepare_rest_app = lambda config: nullcontext(Placeholder())
+from uos.inject import prepare_event_subscriber, prepare_rest_app
 
 
 async def run_rest_app():

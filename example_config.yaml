@@ -21,6 +21,7 @@ cors_exposed_headers: null
 db_name: uos
 docs_url: /docs
 enable_opentelemetry: false
+file_upload_box_topic: file-upload-boxes
 generate_correlation_id: true
 host: 127.0.0.1
 kafka_compression_type: null

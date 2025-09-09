@@ -49,6 +49,21 @@ uos --help
 ### Parameters
 
 The service requires the following configuration parameters:
+- <a id="properties/file_upload_box_topic"></a>**`file_upload_box_topic`** *(string, required)*: Topic containing published FileUploadBox outbox events.
+
+
+  Examples:
+
+  ```json
+  "file-upload-boxes"
+  ```
+
+
+  ```json
+  "file-upload-box-topic"
+  ```
+
+
 - <a id="properties/audit_record_topic"></a>**`audit_record_topic`** *(string, required)*: Name of the topic used for events conveying audit record information.
 
 
