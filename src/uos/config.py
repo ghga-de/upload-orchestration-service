@@ -25,7 +25,6 @@ from hexkit.providers.mongokafka import MongoKafkaConfig
 from uos.adapters.outbound.event_pub import EventPubConfig
 from uos.adapters.outbound.http import AccessApiConfig, UCSApiConfig
 from uos.constants import SERVICE_NAME
-from uos.core.orchestrator import UploadOrchestratorConfig
 
 __all__ = ["Config"]
 
@@ -40,7 +39,6 @@ class Config(
     AccessApiConfig,
     UCSApiConfig,
     EventPubConfig,
-    UploadOrchestratorConfig,
 ):
     """Config parameters and their defaults."""
 

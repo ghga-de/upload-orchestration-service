@@ -17,14 +17,15 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from uuid import UUID
 
+from ghga_service_commons.auth.ghga import AuthContext
 from pydantic import UUID4
 
 from uos.core.models import (
     CreateUploadBoxRequest,
     FileUploadBox,
     GrantAccessRequest,
+    ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
 
@@ -32,12 +33,22 @@ from uos.core.models import (
 class UploadOrchestratorPort(ABC):
     """Port for the Upload Orchestrator service."""
 
+    class BoxAccessError(RuntimeError):
+        """Raised when a ResearchDataUploadBox cannot be accessed."""
+
+    class BoxNotFoundError(RuntimeError):
+        """Raised when a ResearchDataUploadBox is not found in the DB."""
+
+        def __init__(self, *, box_id: UUID4):
+            msg = f"The ResearchDataUploadBox with ID {box_id} was not found in the DB."
+            super().__init__(msg)
+
     @abstractmethod
     async def create_research_data_upload_box(
         self,
         request: CreateUploadBoxRequest,
-        user_id: str,
-    ) -> UUID:
+        user_id: UUID4,
+    ) -> UUID4:
         """Create a new research data upload box.
 
         This operation:
@@ -45,12 +56,11 @@ class UploadOrchestratorPort(ABC):
         2. Creates a ResearchDataUploadBox locally
         3. Emits events and audit records
 
-        Args:
-            request: The upload box creation request
-            user_id: ID of the user creating the box
-
         Returns:
             The UUID of the newly created upload box
+
+        Raises:
+            UCSCallError: if there's a problem creating a corresponding box in the UCS.
         """
         ...
 
@@ -59,17 +69,13 @@ class UploadOrchestratorPort(ABC):
         self,
         box_id: UUID4,
         request: UpdateUploadBoxRequest,
-        user_id: UUID4,
+        auth_context: AuthContext,
     ) -> None:
         """Update a research data upload box.
 
-        Args:
-            box_id: The UUID of the upload box to update
-            request: The update request containing changes
-            user_id: ID of the user making the update
-
         Raises:
-            UploadBoxNotFoundError: If the box doesn't exist
+            BoxNotFoundError: If the box doesn't exist.
+            UCSCallError: if there's a problem updating the corresponding box in the UCS.
         """
         ...
 
@@ -77,42 +83,48 @@ class UploadOrchestratorPort(ABC):
     async def grant_upload_access(
         self,
         request: GrantAccessRequest,
-        granting_user_id: str,
+        granting_user_id: UUID4,
     ) -> None:
         """Grant upload access to a user for a specific upload box.
 
-        Args:
-            request: The access grant request
-            granting_user_id: ID of the user granting access (must be Data Steward)
-
         Raises:
-            UploadBoxNotFoundError: If the box doesn't exist
+            BoxNotFoundError: If the box doesn't exist.
         """
         ...
 
     @abstractmethod
     async def get_upload_box_files(
         self,
-        box_id: UUID,
-        user_id: str,
-        is_data_steward: bool,
-    ) -> Sequence[str]:
+        box_id: UUID4,
+        auth_context: AuthContext,
+    ) -> Sequence[UUID4]:
         """Get list of file IDs for an upload box.
-
-        Args:
-            box_id: The UUID of the research data upload box
-            user_id: ID of the user requesting the list
-            is_data_steward: Whether the user has Data Steward role
 
         Returns:
             Sequence of file IDs in the upload box
 
         Raises:
-            UploadBoxNotFoundError: If the box doesn't exist
-            PermissionError: If the user doesn't have access to the box
+            BoxNotFoundError: If the box doesn't exist.
+            BoxAccessError: If the user doesn't have access to the box.
+            UCSCallError: if there's a problem querying the UCS.
         """
         ...
 
     @abstractmethod
     async def upsert_file_upload_box(self, file_upload_box: FileUploadBox) -> None:
-        """Update the FileUploadBox portion of a ResearchDataUploadBox"""
+        """Handle FileUploadBox update events from UCS.
+
+        Updates the corresponding ResearchDataUploadBox with latest file count and size.
+        """
+
+    @abstractmethod
+    async def get_research_data_upload_box(
+        self, *, box_id: UUID4, user_id: UUID4
+    ) -> ResearchDataUploadBox:
+        """Retrieve a Research Data Upload Box by ID
+
+        Raises:
+            BoxAccessError: If the user doesn't have access to the box
+            BoxNotFoundError: If the box doesn't exist
+        """
+        ...

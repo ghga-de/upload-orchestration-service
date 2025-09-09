@@ -2,22 +2,6 @@
   "additionalProperties": false,
   "description": "Modifies the original Settings class provided by the user",
   "properties": {
-    "work_order_signing_key": {
-      "description": "The private key for signing work order tokens",
-      "examples": [
-        "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
-      ],
-      "format": "password",
-      "title": "Work Order Signing Key",
-      "type": "string",
-      "writeOnly": true
-    },
-    "ucs_public_key": {
-      "description": "The public key used to encrypt work order tokens sent to the UCS",
-      "examples": [],
-      "title": "Ucs Public Key",
-      "type": "string"
-    },
     "audit_record_topic": {
       "description": "Name of the topic used for events conveying audit record information.",
       "examples": [
@@ -40,6 +24,22 @@
         "http://127.0.0.1/upload"
       ],
       "title": "Ucs Url",
+      "type": "string"
+    },
+    "work_order_signing_key": {
+      "description": "The private key for signing work order tokens",
+      "examples": [
+        "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
+      ],
+      "format": "password",
+      "title": "Work Order Signing Key",
+      "type": "string",
+      "writeOnly": true
+    },
+    "ucs_public_key": {
+      "description": "The public key used to encrypt work order tokens sent to the UCS",
+      "examples": [],
+      "title": "Ucs Public Key",
       "type": "string"
     },
     "access_url": {
@@ -479,11 +479,11 @@
     }
   },
   "required": [
-    "work_order_signing_key",
-    "ucs_public_key",
     "audit_record_topic",
     "audit_record_type",
     "ucs_url",
+    "work_order_signing_key",
+    "ucs_public_key",
     "access_url",
     "service_instance_id",
     "kafka_servers",

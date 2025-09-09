@@ -17,7 +17,9 @@
 
 import logging
 from collections.abc import Sequence
+from uuid import UUID
 
+import httpx
 from ghga_service_commons.utils.crypt import encrypt
 from jwcrypto import jwk
 from pydantic import UUID4, Field, SecretStr
@@ -105,31 +107,112 @@ class UCSClient(UCSClientPort):
             log.error(key_error)
             raise key_error
 
-    async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
-        """Create a new FileUploadBox in UCS."""
-        signed_wot = sign_work_order_token(CreateFileBoxWorkOrder(), self._signing_key)
+    def _auth_header(self, signed_wot: str) -> dict[str, str]:
         encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
-        raise NotImplementedError()
+        headers = {"Authorization": f"Bearer {encrypted_wot}"}
+        return headers
 
-    async def lock_file_upload_box(self, *, box_id: UUID4, signing_key: str) -> None:
-        """Lock a FileUploadBox in UCS."""
+    async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
+        """Create a new FileUploadBox in UCS.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
+        signed_wot = sign_work_order_token(CreateFileBoxWorkOrder(), self._signing_key)
+        headers = self._auth_header(signed_wot)
+        body = {"storage_alias": storage_alias}
+        response = httpx.post(f"{self._ucs_url}/boxes", headers=headers, json=body)
+        if response.status_code != 201:
+            log.error(
+                "Error creating new FileUploadBox in the UCS with storage alias %s.",
+                storage_alias,
+                extra={
+                    "status_code": response.status_code,
+                    "response_body": response.json(),
+                },
+            )
+            raise self.UCSCallError("Failed to create new FileUploadBox.")
+        try:
+            box_id = response.json()
+            return UUID(box_id)
+        except Exception as err:
+            msg = "Failed to extract box ID from response body."
+            log.error(msg, exc_info=True)
+            raise self.UCSCallError(msg) from err
+
+    async def lock_file_upload_box(self, *, box_id: UUID4) -> None:
+        """Lock a FileUploadBox in UCS.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
         wot = ChangeFileBoxWorkOrder(work_type="lock", box_id=box_id)
         signed_wot = sign_work_order_token(wot, self._signing_key)
-        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
-        raise NotImplementedError()
+        headers = self._auth_header(signed_wot)
+        body = {"lock": True}
+        response = httpx.patch(
+            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+        )
+        if response.status_code != 204:
+            log.error(
+                "Error locking FileUploadBox ID %s in the UCS.",
+                box_id,
+                extra={
+                    "status_code": response.status_code,
+                    "response_body": response.json(),
+                },
+            )
+            raise self.UCSCallError("Failed to lock FileUploadBox.")
 
-    async def unlock_file_upload_box(self, *, box_id: UUID4, signing_key: str) -> None:
-        """Unlock a FileUploadBox in UCS."""
+    async def unlock_file_upload_box(self, *, box_id: UUID4) -> None:
+        """Unlock a FileUploadBox in UCS.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
         wot = ChangeFileBoxWorkOrder(work_type="unlock", box_id=box_id)
         signed_wot = sign_work_order_token(wot, self._signing_key)
-        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
-        raise NotImplementedError()
+        headers = self._auth_header(signed_wot)
+        body = {"lock": False}
+        response = httpx.patch(
+            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+        )
+        if response.status_code != 204:
+            log.error(
+                "Error unlocking FileUploadBox ID %s in the UCS.",
+                box_id,
+                extra={
+                    "status_code": response.status_code,
+                    "response_body": response.json(),
+                },
+            )
+            raise self.UCSCallError("Failed to unlock FileUploadBox.")
 
-    async def get_file_upload_list(
-        self, *, box_id: UUID4, signing_key: str
-    ) -> Sequence[str]:
-        """Get list of file IDs in a FileUploadBox."""
+    async def get_file_upload_list(self, *, box_id: UUID4) -> Sequence[UUID4]:
+        """Get list of file IDs in a FileUploadBox.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
         wot = ViewFileBoxWorkOrder(box_id=box_id)
         signed_wot = sign_work_order_token(wot, self._signing_key)
-        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
-        raise NotImplementedError()
+        headers = self._auth_header(signed_wot)
+        response = httpx.get(f"{self._ucs_url}/boxes/{box_id}/uploads", headers=headers)
+        if response.status_code != 200:
+            log.error(
+                "Error unlocking FileUploadBox ID %s in the UCS.",
+                box_id,
+                extra={
+                    "status_code": response.status_code,
+                    "response_body": response.json(),
+                },
+            )
+            raise self.UCSCallError("Failed to unlock FileUploadBox.")
+
+        try:
+            files = response.json()
+            return [UUID(file) for file in files]
+        except Exception as err:
+            msg = "Failed to extract list of file IDs from response body."
+            log.error(msg, exc_info=True)
+            raise self.UCSCallError(msg) from err

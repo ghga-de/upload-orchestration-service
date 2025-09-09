@@ -19,25 +19,19 @@ import logging
 from collections.abc import Sequence
 from uuid import UUID
 
-from ghga_service_commons.utils.crypt import encrypt
-from hexkit.protocols.dao import NoHitsFoundError
+from ghga_service_commons.auth.ghga import AuthContext
+from hexkit.protocols.dao import NoHitsFoundError, ResourceNotFoundError
 from hexkit.utils import now_utc_ms_prec
-from jwcrypto import jwk
-from pydantic import UUID4, Field, SecretStr
-from pydantic_settings import BaseSettings
+from pydantic import UUID4
 
 from uos.core.models import (
-    ChangeFileBoxWorkOrder,
-    CreateFileBoxWorkOrder,
     CreateUploadBoxRequest,
     FileUploadBox,
     GrantAccessRequest,
     ResearchDataUploadBox,
     ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
-    ViewFileBoxWorkOrder,
 )
-from uos.core.tokens import sign_work_order_token
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.audit import AuditRepositoryPort
 from uos.ports.outbound.dao import BoxDao
@@ -48,41 +42,17 @@ log = logging.getLogger(__name__)
 __all__ = ["UploadOrchestrator"]
 
 
-class UploadOrchestratorConfig(BaseSettings):
-    """Config parameters needed for the UploadOrchestrator."""
-
-    work_order_signing_key: SecretStr = Field(
-        ...,
-        description="The private key for signing work order tokens",
-        examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
-    )
-    ucs_public_key: str = Field(
-        ...,
-        description="The public key used to encrypt work order tokens sent to the UCS",
-        examples=[],  # TODO: fill in this and check the type-hint
-    )
-
-
 class UploadOrchestrator(UploadOrchestratorPort):
     """A class for orchestrating upload operations."""
 
     def __init__(
         self,
         *,
-        config: UploadOrchestratorConfig,
         box_dao: BoxDao,
         audit_repository: AuditRepositoryPort,
         ucs_client: UCSClientPort,
         claims_client: ClaimsClientPort,
     ):
-        self._signing_key = jwk.JWK.from_json(
-            config.work_order_signing_key.get_secret_value()
-        )
-        if not self._signing_key.has_private:
-            key_error = KeyError("No private work order signing key found.")
-            log.error(key_error)
-            raise key_error
-        self._ucs_public_key = config.ucs_public_key
         self._box_dao = box_dao
         self._audit_repository = audit_repository
         self._ucs_client = ucs_client
@@ -99,13 +69,16 @@ class UploadOrchestrator(UploadOrchestratorPort):
         1. Creates a FileUploadBox in the UCS
         2. Creates a ResearchDataUploadBox locally
         3. Emits events and audit records
+
+        Returns:
+            The UUID of the newly created upload box
+
+        Raises:
+            UCSCallError: if there's a problem creating a corresponding box in the UCS.
         """
         # Create FileUploadBox in UCS
-        signed_wot = sign_work_order_token(CreateFileBoxWorkOrder(), self._signing_key)
-        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
         file_upload_box_id = await self._ucs_client.create_file_upload_box(
-            storage_alias=request.storage_alias,
-            work_order=encrypted_wot,
+            storage_alias=request.storage_alias
         )
 
         # Create ResearchDataUploadBox
@@ -128,85 +101,66 @@ class UploadOrchestrator(UploadOrchestratorPort):
         self,
         box_id: UUID4,
         request: UpdateUploadBoxRequest,
-        user_id: UUID4,
+        auth_context: AuthContext,
     ) -> None:
-        """Update a research data upload box."""
-        # Get existing box
-        box = await self._box_dao.get_by_id(box_id)
+        """Update a research data upload box.
 
-        # Track changes for audit
-        changes = []
+        Raises:
+            BoxNotFoundError: If the box doesn't exist.
+            UCSCallError: if there's a problem updating the corresponding box in the UCS.
+        """
+        # Get existing box if user has access to it
+        user_id = UUID(auth_context.id)
+        box = await self.get_research_data_upload_box(box_id=box_id, user_id=user_id)
+        updated_box = box.model_copy(update=request.model_dump())
+        changed_fields = {
+            k: v for k, v in request.model_dump().items() if getattr(box, k) != v
+        }
 
-        # Update fields if provided
-        if request.title is not None:
-            old_title = box.title
-            box.title = request.title
-            changes.append(f"title: '{old_title}' -> '{request.title}'")
+        # If not a data steward, the only acceptable update is to move from OPEN to LOCKED
+        is_data_steward = "data_steward" in auth_context.roles
+        if not is_data_steward and not (
+            changed_fields == {"state": "locked"}
+            and box.state == ResearchDataUploadBoxState.OPEN
+        ):
+            raise self.BoxAccessError("Unauthorized")
 
-        if request.description is not None:
-            box.description = request.description
-            changes.append("description updated")
+        # If locking or unlocking, communicate with UCS (errors handled in ucs_client)
+        if (
+            updated_box.state != box.state
+            and box.state == ResearchDataUploadBoxState.OPEN
+        ):
+            await self._ucs_client.lock_file_upload_box(box_id=box.file_upload_box_id)
+            updated_box.locked = True
+        elif (
+            updated_box.state == ResearchDataUploadBoxState.OPEN
+            and updated_box.state != box.state
+        ):
+            await self._ucs_client.unlock_file_upload_box(box_id=box.file_upload_box_id)
+            updated_box.locked = False
 
-        if request.state is not None:
-            old_state = box.state
-            box.state = request.state
-            changes.append(f"state: {old_state} -> {request.state}")
-
-            # If locking or unlocking, communicate with UCS
-            if (
-                request.state
-                in [
-                    ResearchDataUploadBoxState.LOCKED,
-                    ResearchDataUploadBoxState.CLOSED,
-                ]
-                and old_state == ResearchDataUploadBoxState.OPEN
-            ):
-                wot = ChangeFileBoxWorkOrder(
-                    work_type="lock",
-                    box_id=box.file_upload_box_id,
-                )
-                signed_wot = sign_work_order_token(wot, self._signing_key)
-                encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
-                await self._ucs_client.lock_file_upload_box(
-                    box_id=box.file_upload_box_id,
-                    work_order=encrypted_wot,
-                )
-                box.locked = True
-            elif request.state == ResearchDataUploadBoxState.OPEN and old_state in [
-                ResearchDataUploadBoxState.LOCKED,
-                ResearchDataUploadBoxState.CLOSED,
-            ]:
-                # TODO: maybe put this and lock code into private methods to shorten this method
-                wot = ChangeFileBoxWorkOrder(
-                    work_type="unlock",
-                    box_id=box.file_upload_box_id,
-                )
-                signed_wot = sign_work_order_token(wot, self._signing_key)
-                encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
-                await self._ucs_client.unlock_file_upload_box(
-                    box_id=box.file_upload_box_id,
-                    work_order=encrypted_wot,
-                )
-                box.locked = False
-
-        # Update metadata
-        box.last_changed = now_utc_ms_prec()
-        box.changed_by = user_id
-        await self._box_dao.update(box)
+        # Update the research data upload box in the DB
+        updated_box.last_changed = now_utc_ms_prec()
+        updated_box.changed_by = user_id
+        await self._box_dao.update(updated_box)
 
         # Create audit record
-        await self._audit_repository.log_box_updated(box=box, user_id=user_id)
+        await self._audit_repository.log_box_updated(box=updated_box, user_id=user_id)
 
     async def grant_upload_access(
         self,
         request: GrantAccessRequest,
-        granting_user_id: str,
+        granting_user_id: UUID4,
     ) -> None:
-        """Grant upload access to a user for a specific upload box."""
+        """Grant upload access to a user for a specific upload box.
+
+        Raises:
+            BoxNotFoundError: If the box doesn't exist.
+        """
         # Verify the upload box exists
         await self._box_dao.get_by_id(request.box_id)
 
-        # Grant access via Claims Repository Service
+        # Grant access via Claims Repository Service (errors handled by claims client)
         await self._claims_client.grant_upload_access(
             user_id=request.user_id,
             iva_id=request.iva_id,
@@ -216,13 +170,24 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
     async def get_upload_box_files(
         self,
-        box_id: UUID,
-        user_id: str,
-        is_data_steward: bool,
-    ) -> Sequence[str]:
-        """Get list of file IDs for an upload box."""
+        box_id: UUID4,
+        auth_context: AuthContext,
+    ) -> Sequence[UUID4]:
+        """Get list of file IDs for an upload box.
+
+        Returns:
+            Sequence of file IDs in the upload box
+
+        Raises:
+            BoxNotFoundError: If the box doesn't exist.
+            BoxAccessError: If the user doesn't have access to the box.
+            UCSCallError: if there's a problem querying the UCS.
+        """
         # Verify access
         upload_box = await self._box_dao.get_by_id(box_id)
+
+        is_data_steward = "data_steward" in auth_context.roles
+        user_id = UUID(auth_context.id)
 
         if not is_data_steward:
             # Check if user has access to this box
@@ -230,19 +195,14 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 user_id
             )
             if box_id not in accessible_boxes:
-                raise PermissionError(
+                raise self.BoxAccessError(
                     f"User {user_id} does not have access to upload box {box_id}"
                 )
 
         # Get file list from UCS
-        wot = ViewFileBoxWorkOrder(box_id=upload_box.file_upload_box_id)
-        signed_wot = sign_work_order_token(wot, self._signing_key)
-        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
         file_ids = await self._ucs_client.get_file_upload_list(
             box_id=upload_box.file_upload_box_id,
-            work_order=encrypted_wot,
         )
-
         return file_ids
 
     async def upsert_file_upload_box(self, file_upload_box: FileUploadBox) -> None:
@@ -272,3 +232,32 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 + " FileUploadBox with ID %s. Was it just created?",
                 file_upload_box.id,
             )
+
+    async def get_research_data_upload_box(
+        self, *, box_id: UUID4, user_id: UUID4
+    ) -> ResearchDataUploadBox:
+        """Retrieve a Research Data Upload Box by ID
+
+        Raises:
+            BoxAccessError: If the user doesn't have access to the box
+            BoxNotFoundError: If the box doesn't exist
+        """
+        # Check that the user has access to this box (if nonexistent, show unauthorized)
+        has_access = await self._claims_client.check_box_access(
+            box_id=box_id, user_id=user_id
+        )
+
+        if not has_access:
+            log.error(
+                "User ID %s does not have access to ResearchDataUploadBox with"
+                + " ID %s OR it does not exist.",
+                user_id,
+                box_id,
+            )
+            raise self.BoxAccessError("Unauthorized")
+
+        # Return the box if it exists
+        try:
+            return await self._box_dao.get_by_id(box_id)
+        except ResourceNotFoundError as err:
+            raise self.BoxNotFoundError(box_id=box_id) from err

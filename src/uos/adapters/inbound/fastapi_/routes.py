@@ -18,11 +18,16 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import UUID4
 
 from uos.adapters.inbound.fastapi_.auth import UserAuthContext
 from uos.adapters.inbound.fastapi_.dummies import UploadOrchestratorDummy
+from uos.adapters.inbound.fastapi_.http_exceptions import (
+    HttpBoxNotFoundError,
+    HttpInternalError,
+    HttpNotAuthorizedError,
+)
 from uos.constants import TRACER
 from uos.core.models import (
     CreateUploadBoxRequest,
@@ -34,6 +39,8 @@ from uos.core.models import (
 log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# TODO: fill in possible response codes (but don't define all the text like in UCS)
 
 
 def check_data_steward_role(auth_context: UserAuthContext) -> bool:
@@ -56,6 +63,7 @@ async def health():
 @router.get(
     "/boxes/{box_id}",
     summary="Get upload box details",
+    description="Returns the details of an existing research data upload box.",
     tags=["UploadOrchestrationService"],
     response_model=ResearchDataUploadBox,
 )
@@ -67,36 +75,24 @@ async def get_research_data_upload_box(
 ):
     """Get details of a specific upload box."""
     try:
-        upload_box = await upload_service.get_research_data_upload_box(box_id=box_id)
-
-        # Check access permissions
-        user_id = auth_context.id
-        is_data_steward = check_data_steward_role(auth_context)
-
-        if not is_data_steward:
-            # Check if user has access to this specific box
-            accessible_boxes = (
-                await upload_service._claims_client.get_accessible_upload_boxes(user_id)
-            )
-            if box_id not in accessible_boxes:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied to this upload box",
-                )
-
-        return upload_box
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get upload box: {exc}",
-        ) from exc
+        user_id = UUID(auth_context.id)
+        await upload_service.get_research_data_upload_box(
+            box_id=box_id, user_id=user_id
+        )
+    except upload_service.BoxAccessError as err:
+        raise HttpNotAuthorizedError() from err
+    except upload_service.BoxNotFoundError as err:
+        raise HttpBoxNotFoundError(box_id=box_id) from err
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to get upload box") from err
 
 
 @router.post(
     "/boxes",
     summary="Create upload box",
+    description="Create a new research data upload box to label and track related file"
+    + " uploads for a given user.",
     tags=["UploadOrchestrationService"],
     response_model=UUID4,
     status_code=status.HTTP_201_CREATED,
@@ -110,10 +106,7 @@ async def create_research_data_upload_box(
     """Create a new upload box. Requires Data Steward role."""
     # Check if user has Data Steward role
     if not check_data_steward_role(auth_context):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Data Steward role required to create upload boxes",
-        )
+        raise HttpNotAuthorizedError()
 
     try:
         box_id = await upload_service.create_research_data_upload_box(
@@ -122,15 +115,16 @@ async def create_research_data_upload_box(
         )
         return box_id
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create upload box: {exc}",
-        ) from exc
+        raise HttpInternalError(message="Failed to create upload box") from exc
 
 
 @router.patch(
     "/boxes/{box_id}",
     summary="Update upload box",
+    description="Update modifiable details for a research data upload box, including"
+    + " the description, title, and state. When modifying the state, users are only"
+    + " allowed to move the state from OPEN to LOCKED, and all other changes are"
+    + " restricted to Data Stewards.",
     tags=["UploadOrchestrationService"],
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
@@ -148,17 +142,19 @@ async def update_research_data_upload_box(
             box_id=box_id, request=request, auth_context=auth_context
         )
     except upload_service.BoxAccessError as err:
-        raise NotImplementedError()  # TODO: 403
+        raise HttpNotAuthorizedError() from err
     except upload_service.BoxNotFoundError as err:
-        raise NotImplementedError()  # TODO: 404
+        raise HttpBoxNotFoundError(box_id=box_id) from err
     except Exception as err:
         log.error(err, exc_info=True)
-        raise NotImplementedError()  # TODO: 500 + log
+        raise HttpInternalError(message="Failed to update upload box") from err
 
 
 @router.post(
     "/access-grant",
     summary="Grant upload access",
+    description="Grant upload access to a user for a single research data upload box."
+    + " Users cannot upload any files until they have been granted access to a box.",
     tags=["UploadOrchestrationService"],
     status_code=status.HTTP_201_CREATED,
 )
@@ -171,10 +167,7 @@ async def grant_upload_access(
     """Grant upload access to a user. Requires Data Steward role."""
     # Check if user has Data Steward role
     if not check_data_steward_role(auth_context):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Data Steward role required to grant upload access",
-        )
+        raise HttpNotAuthorizedError()
 
     try:
         await upload_service.grant_upload_access(
@@ -184,15 +177,13 @@ async def grant_upload_access(
         return {"message": "Upload access granted successfully"}
     except Exception as exc:
         log.error(exc, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to grant upload access: {exc}",
-        ) from exc
+        raise HttpInternalError(message="Failed to grant upload access") from exc
 
 
 @router.get(
     "/boxes/{box_id}/uploads",
     summary="List files in upload box",
+    description="List the file IDs of all files uploaded for a research data upload box.",
     tags=["UploadOrchestrationService"],
     response_model=list[str],
 )
@@ -210,9 +201,9 @@ async def list_upload_box_files(
         )
         return file_ids
     except upload_service.BoxAccessError as err:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN) from err
+        raise HttpNotAuthorizedError() from err
     except upload_service.BoxNotFoundError as err:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from err
+        raise HttpBoxNotFoundError(box_id=box_id) from err
     except Exception as err:
         log.error(err, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) from err
+        raise HttpInternalError(message="Failed to list upload box files") from err

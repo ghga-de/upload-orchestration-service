@@ -48,22 +48,42 @@ class UCSClientPort(ABC):
     This class is responsible for WOT generation and all pertinent error handling.
     """
 
+    # TODO: Update doc strings in the concrete def
+    class UCSCallError(RuntimeError):
+        """Raised when there's an error while communicating with the UCS"""
+
     @abstractmethod
     async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
-        """Create a new FileUploadBox in UCS."""
+        """Create a new FileUploadBox in UCS.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
         ...
 
     @abstractmethod
     async def lock_file_upload_box(self, *, box_id: UUID4) -> None:
-        """Lock a FileUploadBox in UCS."""
+        """Lock a FileUploadBox in UCS.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
         ...
 
     @abstractmethod
     async def unlock_file_upload_box(self, *, box_id: UUID4) -> None:
-        """Unlock a FileUploadBox in UCS."""
+        """Unlock a FileUploadBox in UCS.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
         ...
 
     @abstractmethod
-    async def get_file_upload_list(self, *, box_id: UUID4) -> Sequence[str]:
-        """Get list of file IDs in a FileUploadBox."""
+    async def get_file_upload_list(self, *, box_id: UUID4) -> Sequence[UUID4]:
+        """Get list of file IDs in a FileUploadBox.
+
+        Raises:
+            UCSCallError if there's a problem with the operation.
+        """
         ...

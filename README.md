@@ -49,6 +49,61 @@ uos --help
 ### Parameters
 
 The service requires the following configuration parameters:
+- <a id="properties/audit_record_topic"></a>**`audit_record_topic`** *(string, required)*: Name of the topic used for events conveying audit record information.
+
+
+  Examples:
+
+  ```json
+  "audit-records"
+  ```
+
+
+- <a id="properties/audit_record_type"></a>**`audit_record_type`** *(string, required)*: The type used for events conveying audit record information.
+
+
+  Examples:
+
+  ```json
+  "audit_record_logged"
+  ```
+
+
+- <a id="properties/ucs_url"></a>**`ucs_url`** *(string, required)*: URL pointing to the UCS API.
+
+
+  Examples:
+
+  ```json
+  "http://127.0.0.1/upload"
+  ```
+
+
+- <a id="properties/work_order_signing_key"></a>**`work_order_signing_key`** *(string, format: password, required, write-only)*: The private key for signing work order tokens.
+
+
+  Examples:
+
+  ```json
+  "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
+  ```
+
+
+- <a id="properties/ucs_public_key"></a>**`ucs_public_key`** *(string, required)*: The public key used to encrypt work order tokens sent to the UCS.
+
+
+  Examples:
+
+- <a id="properties/access_url"></a>**`access_url`** *(string, required)*: URL pointing to the internal access API.
+
+
+  Examples:
+
+  ```json
+  "http://127.0.0.1/access"
+  ```
+
+
 - <a id="properties/service_name"></a>**`service_name`** *(string)*: Default: `"uos"`.
 
 - <a id="properties/service_instance_id"></a>**`service_instance_id`** *(string, required)*: A string that uniquely identifies this instance across all instances of this service. This is included in log messages.
@@ -310,6 +365,26 @@ The service requires the following configuration parameters:
 
 
 - <a id="properties/log_traceback"></a>**`log_traceback`** *(boolean)*: Whether to include exception tracebacks in log messages. Default: `true`.
+
+- <a id="properties/auth_key"></a>**`auth_key`** *(string, required)*: The GHGA internal public key for validating the token signature.
+
+
+  Examples:
+
+  ```json
+  "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
+  ```
+
+
+- <a id="properties/auth_algs"></a>**`auth_algs`** *(array)*: A list of all algorithms used for signing GHGA internal tokens. Default: `["ES256"]`.
+
+  - <a id="properties/auth_algs/items"></a>**Items** *(string)*
+
+- <a id="properties/auth_check_claims"></a>**`auth_check_claims`** *(object)*: A dict of all GHGA internal claims that shall be verified. Can contain additional properties. Default: `{"id": null, "name": null, "email": null, "iat": null, "exp": null}`.
+
+- <a id="properties/auth_map_claims"></a>**`auth_map_claims`** *(object)*: A mapping of claims to attributes in the GHGA auth context. Can contain additional properties. Default: `{}`.
+
+  - <a id="properties/auth_map_claims/additionalProperties"></a>**Additional properties** *(string)*
 
 - <a id="properties/host"></a>**`host`** *(string)*: IP of the host. Default: `"127.0.0.1"`.
 
