@@ -35,7 +35,7 @@ from uos.core.models import (
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.audit import AuditRepositoryPort
 from uos.ports.outbound.dao import BoxDao
-from uos.ports.outbound.http import ClaimsClientPort, UCSClientPort
+from uos.ports.outbound.http import AccessClientPort, UCSClientPort
 
 log = logging.getLogger(__name__)
 
@@ -51,12 +51,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
         box_dao: BoxDao,
         audit_repository: AuditRepositoryPort,
         ucs_client: UCSClientPort,
-        claims_client: ClaimsClientPort,
+        claims_client: AccessClientPort,
     ):
         self._box_dao = box_dao
         self._audit_repository = audit_repository
         self._ucs_client = ucs_client
-        self._claims_client = claims_client
+        self._access_client = claims_client
 
     async def create_research_data_upload_box(
         self,
@@ -160,8 +160,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # Verify the upload box exists
         await self._box_dao.get_by_id(request.box_id)
 
-        # Grant access via Claims Repository Service (errors handled by claims client)
-        await self._claims_client.grant_upload_access(
+        # Grant access via Claims Repository Service (errors handled by access client)
+        await self._access_client.grant_upload_access(
             user_id=request.user_id,
             iva_id=request.iva_id,
             box_id=request.box_id,
@@ -191,7 +191,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         if not is_data_steward:
             # Check if user has access to this box
-            accessible_boxes = await self._claims_client.get_accessible_upload_boxes(
+            accessible_boxes = await self._access_client.get_accessible_upload_boxes(
                 user_id
             )
             if box_id not in accessible_boxes:
@@ -243,7 +243,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
             BoxNotFoundError: If the box doesn't exist
         """
         # Check that the user has access to this box (if nonexistent, show unauthorized)
-        has_access = await self._claims_client.check_box_access(
+        has_access = await self._access_client.check_box_access(
             box_id=box_id, user_id=user_id
         )
 

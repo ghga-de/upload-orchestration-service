@@ -16,6 +16,7 @@
 """FastAPI endpoints for UOS interaction"""
 
 import logging
+from enum import Enum
 from uuid import UUID
 
 from fastapi import APIRouter, status
@@ -40,6 +41,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
+TAGS: list[str | Enum] = ["UploadOrchestrationService"]
 # TODO: fill in possible response codes (but don't define all the text like in UCS)
 
 
@@ -51,7 +53,7 @@ def check_data_steward_role(auth_context: UserAuthContext) -> bool:
 @router.get(
     "/health",
     summary="health",
-    tags=["UploadOrchestrationService"],
+    tags=TAGS,
     status_code=200,
 )
 @TRACER.start_as_current_span("routes.health")
@@ -64,7 +66,7 @@ async def health():
     "/boxes/{box_id}",
     summary="Get upload box details",
     description="Returns the details of an existing research data upload box.",
-    tags=["UploadOrchestrationService"],
+    tags=TAGS,
     response_model=ResearchDataUploadBox,
 )
 @TRACER.start_as_current_span("routes.get_research_data_upload_box")
@@ -93,7 +95,7 @@ async def get_research_data_upload_box(
     summary="Create upload box",
     description="Create a new research data upload box to label and track related file"
     + " uploads for a given user.",
-    tags=["UploadOrchestrationService"],
+    tags=TAGS,
     response_model=UUID4,
     status_code=status.HTTP_201_CREATED,
 )
@@ -125,7 +127,7 @@ async def create_research_data_upload_box(
     + " the description, title, and state. When modifying the state, users are only"
     + " allowed to move the state from OPEN to LOCKED, and all other changes are"
     + " restricted to Data Stewards.",
-    tags=["UploadOrchestrationService"],
+    tags=TAGS,
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
 )
@@ -155,7 +157,7 @@ async def update_research_data_upload_box(
     summary="Grant upload access",
     description="Grant upload access to a user for a single research data upload box."
     + " Users cannot upload any files until they have been granted access to a box.",
-    tags=["UploadOrchestrationService"],
+    tags=TAGS,
     status_code=status.HTTP_201_CREATED,
 )
 @TRACER.start_as_current_span("routes.grant_upload_access")
@@ -184,7 +186,7 @@ async def grant_upload_access(
     "/boxes/{box_id}/uploads",
     summary="List files in upload box",
     description="List the file IDs of all files uploaded for a research data upload box.",
-    tags=["UploadOrchestrationService"],
+    tags=TAGS,
     response_model=list[str],
 )
 @TRACER.start_as_current_span("routes.list_upload_box_files")

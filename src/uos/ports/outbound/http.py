@@ -16,29 +16,43 @@
 """Ports centered around outbound http calls"""
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
 
 from pydantic import UUID4
 
 
-class ClaimsClientPort(ABC):
+class AccessClientPort(ABC):
     """An adapter for interacting with the access API to manage upload access claims"""
+
+    class AccessAPIError(RuntimeError):
+        """Raised when there's an error while communicating with the Access API"""
 
     @abstractmethod
     async def grant_upload_access(
         self, *, user_id: UUID4, iva_id: UUID4, box_id: UUID4
     ) -> None:
-        """Grant upload access to a user for a box."""
+        """Grant upload access to a user for a box.
+
+        Raises:
+            AccessAPIError if there's a problem during the operation.
+        """
         ...
 
     @abstractmethod
-    async def get_accessible_upload_boxes(self, user_id: UUID4) -> Sequence[UUID4]:
-        """Get list of upload box IDs accessible to a user."""
+    async def get_accessible_upload_boxes(self, user_id: UUID4) -> list[UUID4]:
+        """Get list of upload box IDs accessible to a user.
+
+        Raises:
+            AccessAPIError if there's a problem during the operation.
+        """
         ...
 
     @abstractmethod
     async def check_box_access(self, *, user_id: UUID4, box_id: UUID4) -> bool:
-        """Check if a user has access to a specific upload box."""
+        """Check if a user has access to a specific upload box.
+
+        Raises:
+            AccessAPIError if there's a problem during the operation.
+        """
         ...
 
 
@@ -48,7 +62,6 @@ class UCSClientPort(ABC):
     This class is responsible for WOT generation and all pertinent error handling.
     """
 
-    # TODO: Update doc strings in the concrete def
     class UCSCallError(RuntimeError):
         """Raised when there's an error while communicating with the UCS"""
 
@@ -80,7 +93,7 @@ class UCSClientPort(ABC):
         ...
 
     @abstractmethod
-    async def get_file_upload_list(self, *, box_id: UUID4) -> Sequence[UUID4]:
+    async def get_file_upload_list(self, *, box_id: UUID4) -> list[UUID4]:
         """Get list of file IDs in a FileUploadBox.
 
         Raises:

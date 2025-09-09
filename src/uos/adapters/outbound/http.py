@@ -16,7 +16,6 @@
 """Outbound HTTP calls"""
 
 import logging
-from collections.abc import Sequence
 from uuid import UUID
 
 import httpx
@@ -31,7 +30,7 @@ from uos.core.models import (
     ViewFileBoxWorkOrder,
 )
 from uos.core.tokens import sign_work_order_token
-from uos.ports.outbound.http import ClaimsClientPort, UCSClientPort
+from uos.ports.outbound.http import AccessClientPort, UCSClientPort
 
 TIMEOUT = 60
 
@@ -69,25 +68,100 @@ class UCSApiConfig(BaseSettings):
     )
 
 
-class ClaimsClient(ClaimsClientPort):
+class AccessClient(AccessClientPort):
     """An adapter for interacting with the access API to manage upload access grants"""
 
     def __init__(self, *, config: AccessApiConfig):
-        self.access_url = config.access_url
+        self._access_url = config.access_url
 
     async def grant_upload_access(
         self, *, user_id: UUID4, iva_id: UUID4, box_id: UUID4
     ) -> None:
-        """Grant upload access to a user for a box."""
-        raise NotImplementedError()
+        """Grant upload access to a user for a box.
 
-    async def get_accessible_upload_boxes(self, user_id: UUID4) -> Sequence[UUID4]:
-        """Get list of upload box IDs accessible to a user."""
-        raise NotImplementedError()
+        Raises:
+            AccessAPIError if there's a problem during the operation.
+        """
+        url = (
+            f"{self._access_url}/upload-access/users"
+            + f"/{user_id}/ivas/{iva_id}/boxes/{box_id}"
+        )
+        response = httpx.get(url)
+        if response.status_code != 200:
+            log.error(
+                "Failed to grant upload access for user %s to box %s.",
+                extra={
+                    "user_id": user_id,
+                    "iva_id": iva_id,
+                    "box_id": box_id,
+                    "status_code": response.status_code,
+                    "response_body": response.json(),
+                },
+            )
+            raise self.AccessAPIError("Failed to grant upload access.")
+
+    async def get_accessible_upload_boxes(self, user_id: UUID4) -> list[UUID4]:
+        """Get list of upload box IDs accessible to a user.
+
+        Raises:
+            AccessAPIError if there's a problem during the operation.
+        """
+        url = f"/upload-access/users/{user_id}/boxes"
+        response = httpx.get(url)
+        if response.status_code != 200:
+            log.error(
+                "Failed to retrieve list of research data upload boxes accessible to"
+                + " user %s from the access API.",
+                user_id,
+            )
+
+        try:
+            box_ids = response.json()
+            return [UUID(box_id) for box_id in box_ids]
+        except Exception as err:
+            msg = "Failed to extract box IDs from response."
+            log.error(msg, exc_info=True, extra={"user_id": user_id})
+            raise self.AccessAPIError(msg) from err
 
     async def check_box_access(self, *, user_id: UUID4, box_id: UUID4) -> bool:
-        """Check if a user has access to a specific upload box."""
-        raise NotImplementedError()
+        """Check if a user has access to a specific upload box.
+
+        Raises:
+            AccessAPIError if there's a problem during the operation.
+        """
+        url = f"{self._access_url}/upload-access/users/{user_id}/boxes/{box_id}"
+
+        try:
+            response = httpx.get(url)
+
+            # 200 means user has access, 403/404 means no access
+            if response.status_code == 200:
+                return True
+            elif response.status_code in (403, 404):
+                return False
+            else:
+                log.error(
+                    "Unexpected response when checking box access for user %s and box %s.",
+                    user_id,
+                    box_id,
+                    extra={
+                        "user_id": user_id,
+                        "box_id": box_id,
+                        "status_code": response.status_code,
+                        "response_body": response.text,
+                    },
+                )
+                raise self.AccessAPIError("Failed to check box access.")
+
+        except httpx.RequestError as err:
+            log.error(
+                "Request failed when checking box access for user %s and box %s.",
+                user_id,
+                box_id,
+                exc_info=True,
+                extra={"user_id": user_id, "box_id": box_id},
+            )
+            raise self.AccessAPIError("Failed to check box access.") from err
 
 
 class UCSClient(UCSClientPort):
@@ -188,7 +262,7 @@ class UCSClient(UCSClientPort):
             )
             raise self.UCSCallError("Failed to unlock FileUploadBox.")
 
-    async def get_file_upload_list(self, *, box_id: UUID4) -> Sequence[UUID4]:
+    async def get_file_upload_list(self, *, box_id: UUID4) -> list[UUID4]:
         """Get list of file IDs in a FileUploadBox.
 
         Raises:
