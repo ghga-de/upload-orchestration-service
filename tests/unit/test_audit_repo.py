@@ -21,8 +21,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
-from hexkit.correlation import get_correlation_id, set_new_correlation_id
+from hexkit.correlation import get_correlation_id
 from hexkit.providers.testing.eventpub import (
     Event,
     InMemEventPublisher,
@@ -37,12 +36,6 @@ from uos.adapters.outbound.event_pub import EventPubTranslator
 from uos.core.models import ResearchDataUploadBox, ResearchDataUploadBoxState
 
 pytestmark = pytest.mark.asyncio()
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def cid_fixture():  # noqa: D103
-    async with set_new_correlation_id() as cid:
-        yield cid
 
 
 AuditFixture = tuple[AuditRepository, InMemEventStore]

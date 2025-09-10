@@ -21,8 +21,6 @@ from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
-import pytest_asyncio
-from hexkit.correlation import set_new_correlation_id
 from hexkit.providers.testing.eventpub import InMemEventPublisher, InMemEventStore
 from hexkit.utils import now_utc_ms_prec
 
@@ -42,12 +40,6 @@ pytestmark = pytest.mark.asyncio()
 
 TEST_UCS_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
-
-
-@pytest_asyncio.fixture(autouse=True)
-async def cid_fixture():  # noqa: D103
-    async with set_new_correlation_id() as cid:
-        yield cid
 
 
 @dataclass

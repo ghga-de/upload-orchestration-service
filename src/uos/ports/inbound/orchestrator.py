@@ -76,6 +76,7 @@ class UploadOrchestratorPort(ABC):
 
         Raises:
             BoxNotFoundError: If the box doesn't exist.
+            BoxAccessError: If the user doesn't have access to the box.
             UCSCallError: if there's a problem updating the corresponding box in the UCS.
         """
         ...

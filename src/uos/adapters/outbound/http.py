@@ -95,7 +95,7 @@ class AccessClient(AccessClientPort):
                     "iva_id": iva_id,
                     "box_id": box_id,
                     "status_code": response.status_code,
-                    "response_body": response.json(),
+                    "response_text": response.text,
                 },
             )
             raise self.AccessAPIError("Failed to grant upload access.")
@@ -202,7 +202,7 @@ class UCSClient(UCSClientPort):
                 storage_alias,
                 extra={
                     "status_code": response.status_code,
-                    "response_body": response.json(),
+                    "response_text": response.text,
                 },
             )
             raise self.UCSCallError("Failed to create new FileUploadBox.")
@@ -233,7 +233,7 @@ class UCSClient(UCSClientPort):
                 box_id,
                 extra={
                     "status_code": response.status_code,
-                    "response_body": response.json(),
+                    "response_text": response.text,
                 },
             )
             raise self.UCSCallError("Failed to lock FileUploadBox.")
@@ -257,7 +257,7 @@ class UCSClient(UCSClientPort):
                 box_id,
                 extra={
                     "status_code": response.status_code,
-                    "response_body": response.json(),
+                    "response_text": response.text,
                 },
             )
             raise self.UCSCallError("Failed to unlock FileUploadBox.")

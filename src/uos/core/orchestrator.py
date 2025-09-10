@@ -108,15 +108,16 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         Raises:
             BoxNotFoundError: If the box doesn't exist.
+            BoxAccessError: If the user doesn't have access to the box.
             UCSCallError: if there's a problem updating the corresponding box in the UCS.
         """
         # Get existing box if user has access to it
         user_id = UUID(auth_context.id)
         box = await self.get_research_data_upload_box(box_id=box_id, user_id=user_id)
-        updated_box = box.model_copy(update=request.model_dump())
         changed_fields = {
-            k: v for k, v in request.model_dump().items() if getattr(box, k) != v
+            k: v for k, v in request.model_dump().items() if v and getattr(box, k) != v
         }
+        updated_box = box.model_copy(update=changed_fields)
 
         # If not a data steward, the only acceptable update is to move from OPEN to LOCKED
         is_data_steward = "data_steward" in auth_context.roles
@@ -128,13 +129,15 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # If locking or unlocking, communicate with UCS (errors handled in ucs_client)
         if (
-            updated_box.state != box.state
+            updated_box.state
+            and updated_box.state != box.state
             and box.state == ResearchDataUploadBoxState.OPEN
         ):
             await self._ucs_client.lock_file_upload_box(box_id=box.file_upload_box_id)
             updated_box.locked = True
         elif (
-            updated_box.state == ResearchDataUploadBoxState.OPEN
+            updated_box.state
+            and updated_box.state == ResearchDataUploadBoxState.OPEN
             and updated_box.state != box.state
         ):
             await self._ucs_client.unlock_file_upload_box(box_id=box.file_upload_box_id)

@@ -19,10 +19,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from ghga_service_commons.api.testing import AsyncTestClient
-from ghga_service_commons.utils.jwt_helpers import (
-    generate_jwk,
-    sign_and_serialize_token,
-)
+from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
@@ -36,7 +33,6 @@ TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
 TEST_BOX_ID = UUID("bf344cd4-0c1b-434a-93d1-36a11b6b02d9")
 INVALID_HEADER: dict[str, str] = {"Authorization": "Bearer ab12"}
 
-SIGNING_KEY_PAIR = generate_jwk()
 DS_AUTH_CLAIMS = {
     "name": "John Doe",
     "email": "john@home.org",

@@ -15,7 +15,9 @@
 """Set up session-scope fixtures for tests."""
 
 import pytest
+import pytest_asyncio
 from ghga_service_commons.utils import jwt_helpers
+from hexkit.correlation import set_new_correlation_id
 from hexkit.providers.akafka.testutils import (  # noqa: F401
     kafka_container_fixture,
     kafka_fixture,
@@ -31,6 +33,7 @@ from hexkit.providers.s3.testutils import (  # noqa: F401
 
 from tests.fixtures import ConfigFixture
 from tests.fixtures.config import get_config
+from tests.fixtures.joint import joint_fixture  # noqa: F401
 
 
 @pytest.fixture(name="config")
@@ -41,3 +44,9 @@ def config_fixture() -> ConfigFixture:
     signing_key = jwt_helpers.generate_jwk().export_private()
     config = get_config(auth_key=auth_key, work_order_signing_key=signing_key)
     return ConfigFixture(config=config, jwk=jwk)
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def cid_fixture():  # noqa: D103
+    async with set_new_correlation_id() as cid:
+        yield cid
