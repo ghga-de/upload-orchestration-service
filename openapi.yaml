@@ -328,6 +328,7 @@ paths:
             application/json:
               schema:
                 items:
+                  format: uuid4
                   type: string
                 title: Response List Upload Box Files Boxes  Box Id  Uploads Get
                 type: array

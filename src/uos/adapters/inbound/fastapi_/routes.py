@@ -36,6 +36,7 @@ from uos.core.models import (
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
+from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
 log = logging.getLogger(__name__)
 
@@ -78,12 +79,13 @@ async def get_research_data_upload_box(
     """Get details of a specific upload box."""
     try:
         user_id = UUID(auth_context.id)
-        await upload_service.get_research_data_upload_box(
+        box = await upload_service.get_research_data_upload_box(
             box_id=box_id, user_id=user_id
         )
-    except upload_service.BoxAccessError as err:
+        return box
+    except UploadOrchestratorPort.BoxAccessError as err:
         raise HttpNotAuthorizedError() from err
-    except upload_service.BoxNotFoundError as err:
+    except UploadOrchestratorPort.BoxNotFoundError as err:
         raise HttpBoxNotFoundError(box_id=box_id) from err
     except Exception as err:
         log.error(err, exc_info=True)
@@ -145,9 +147,9 @@ async def update_research_data_upload_box(
         await upload_service.update_research_data_upload_box(
             box_id=box_id, request=request, auth_context=auth_context
         )
-    except upload_service.BoxAccessError as err:
+    except UploadOrchestratorPort.BoxAccessError as err:
         raise HttpNotAuthorizedError() from err
-    except upload_service.BoxNotFoundError as err:
+    except UploadOrchestratorPort.BoxNotFoundError as err:
         raise HttpBoxNotFoundError(box_id=box_id) from err
     except Exception as err:
         log.error(err, exc_info=True)
@@ -189,7 +191,7 @@ async def grant_upload_access(
     summary="List files in upload box",
     description="List the file IDs of all files uploaded for a research data upload box.",
     tags=TAGS,
-    response_model=list[str],
+    response_model=list[UUID4],
 )
 @TRACER.start_as_current_span("routes.list_upload_box_files")
 async def list_upload_box_files(
@@ -204,9 +206,9 @@ async def list_upload_box_files(
             auth_context=auth_context,
         )
         return file_ids
-    except upload_service.BoxAccessError as err:
+    except UploadOrchestratorPort.BoxAccessError as err:
         raise HttpNotAuthorizedError() from err
-    except upload_service.BoxNotFoundError as err:
+    except UploadOrchestratorPort.BoxNotFoundError as err:
         raise HttpBoxNotFoundError(box_id=box_id) from err
     except Exception as err:
         log.error(err, exc_info=True)
