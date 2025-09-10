@@ -21,22 +21,16 @@ from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
-from hexkit.providers.testing.eventpub import InMemEventPublisher, InMemEventStore
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
 from tests.fixtures.in_mem_dao import BaseInMemDao, InMemBoxDao
-from uos.adapters.outbound.audit import AuditRepository
-from uos.adapters.outbound.event_pub import EventPubTranslator
 from uos.config import Config
 from uos.core import models
 from uos.core.orchestrator import UploadOrchestrator
-from uos.ports.outbound.audit import AuditRepositoryPort
 from uos.ports.outbound.http import AccessClientPort, UCSClientPort
 
 pytestmark = pytest.mark.asyncio()
-
-# TODO: Just use mock for audit repo if we don't actually need to test it here
 
 TEST_UCS_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
@@ -48,8 +42,6 @@ class JointRig:
 
     config: Config
     box_dao: BaseInMemDao[models.ResearchDataUploadBox]
-    audit_repository: AuditRepositoryPort
-    event_store: InMemEventStore  # to check the published audit events
     ucs_client: UCSClientPort
     access_client: AccessClientPort
     controller: UploadOrchestrator
@@ -62,28 +54,19 @@ def rig(config: ConfigFixture) -> JointRig:
     ucs_client_mock = AsyncMock()
     ucs_client_mock.create_file_upload_box.return_value = TEST_UCS_BOX_ID
     access_client_mock = AsyncMock()
-    event_store = InMemEventStore()
-    event_pub_translator = EventPubTranslator(
-        config=_config, provider=InMemEventPublisher(event_store=event_store)
-    )
-    audit_repository = AuditRepository(
-        service="uos", event_publisher=event_pub_translator
-    )
 
     controller = UploadOrchestrator(
         box_dao=(box_dao := InMemBoxDao()),
         ucs_client=ucs_client_mock,
         access_client=access_client_mock,
-        audit_repository=audit_repository,
+        audit_repository=AsyncMock(),
     )
 
     return JointRig(
         config=_config,
-        event_store=event_store,
         box_dao=box_dao,
         ucs_client=ucs_client_mock,
         access_client=access_client_mock,
-        audit_repository=audit_repository,
         controller=controller,
     )
 
