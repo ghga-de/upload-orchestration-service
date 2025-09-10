@@ -67,7 +67,7 @@ class AuditRepository(AuditRepositoryPort):
             description=f"A new ResearchDataUploadBox was created with '{box.title}' (ID: {box.id}).",
             user_id=user_id,
             action="C",
-            entity=ResearchDataUploadBox.__class__.__name__,
+            entity=ResearchDataUploadBox.__name__,
             entity_id=str(box.id),
         )
 
@@ -80,7 +80,7 @@ class AuditRepository(AuditRepositoryPort):
             description=f"ResearchDataUploadBox '{box.title}' (ID: {box.id}) was updated. New state: {box.state}.",
             user_id=user_id,
             action="U",
-            entity=ResearchDataUploadBox.__class__.__name__,
+            entity=ResearchDataUploadBox.__name__,
             entity_id=str(box.id),
         )
 
