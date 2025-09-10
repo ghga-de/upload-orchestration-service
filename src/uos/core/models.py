@@ -140,9 +140,13 @@ class ViewFileBoxWorkOrder(BaseWorkOrderToken):
 class CreateUploadBoxRequest(BaseModel):
     """Request model for creating a new research data upload box."""
 
-    title: str = Field(..., description="Short meaningful name for the box")
+    title: str = Field(
+        ..., description="Short meaningful name for the box", min_length=1
+    )
     description: str = Field(..., description="Describes the upload box in more detail")
-    storage_alias: str = Field(..., description="S3 storage alias to use for uploads")
+    storage_alias: str = Field(
+        ..., description="S3 storage alias to use for uploads", min_length=1
+    )
 
 
 class CreateUploadBoxResponse(BaseModel):

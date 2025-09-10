@@ -102,7 +102,7 @@ async def prepare_core(
         yield UploadOrchestrator(
             box_dao=box_dao,
             audit_repository=audit_repository,
-            claims_client=claims_client,
+            access_client=claims_client,
             ucs_client=ucs_client,
         )
 

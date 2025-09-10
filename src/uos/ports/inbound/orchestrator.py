@@ -22,7 +22,6 @@ from ghga_service_commons.auth.ghga import AuthContext
 from pydantic import UUID4
 
 from uos.core.models import (
-    CreateUploadBoxRequest,
     FileUploadBox,
     GrantAccessRequest,
     ResearchDataUploadBox,
@@ -46,7 +45,9 @@ class UploadOrchestratorPort(ABC):
     @abstractmethod
     async def create_research_data_upload_box(
         self,
-        request: CreateUploadBoxRequest,
+        title: str,
+        description: str,
+        storage_alias: str,
         user_id: UUID4,
     ) -> UUID4:
         """Create a new research data upload box.

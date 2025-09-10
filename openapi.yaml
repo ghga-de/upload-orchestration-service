@@ -9,10 +9,12 @@ components:
           type: string
         storage_alias:
           description: S3 storage alias to use for uploads
+          minLength: 1
           title: Storage Alias
           type: string
         title:
           description: Short meaningful name for the box
+          minLength: 1
           title: Title
           type: string
       required:

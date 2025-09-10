@@ -25,7 +25,7 @@ from uos import __version__
 from uos.adapters.inbound.fastapi_.routes import router
 from uos.config import Config
 
-config = Config()
+config = Config()  # type: ignore
 
 
 def get_openapi_schema(api) -> dict[str, Any]:

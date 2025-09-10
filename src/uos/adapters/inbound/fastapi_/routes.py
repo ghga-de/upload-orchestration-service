@@ -112,7 +112,9 @@ async def create_research_data_upload_box(
 
     try:
         box_id = await upload_service.create_research_data_upload_box(
-            request=request,
+            title=request.title,
+            description=request.description,
+            storage_alias=request.storage_alias,
             user_id=UUID(auth_context.id),
         )
         return box_id

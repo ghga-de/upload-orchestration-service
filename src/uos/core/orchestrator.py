@@ -25,7 +25,6 @@ from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
 from uos.core.models import (
-    CreateUploadBoxRequest,
     FileUploadBox,
     GrantAccessRequest,
     ResearchDataUploadBox,
@@ -51,16 +50,18 @@ class UploadOrchestrator(UploadOrchestratorPort):
         box_dao: BoxDao,
         audit_repository: AuditRepositoryPort,
         ucs_client: UCSClientPort,
-        claims_client: AccessClientPort,
+        access_client: AccessClientPort,
     ):
         self._box_dao = box_dao
         self._audit_repository = audit_repository
         self._ucs_client = ucs_client
-        self._access_client = claims_client
+        self._access_client = access_client
 
     async def create_research_data_upload_box(
         self,
-        request: CreateUploadBoxRequest,
+        title: str,
+        description: str,
+        storage_alias: str,
         user_id: UUID4,
     ) -> UUID4:
         """Create a new research data upload box.
@@ -78,18 +79,18 @@ class UploadOrchestrator(UploadOrchestratorPort):
         """
         # Create FileUploadBox in UCS
         file_upload_box_id = await self._ucs_client.create_file_upload_box(
-            storage_alias=request.storage_alias
+            storage_alias=storage_alias
         )
 
         # Create ResearchDataUploadBox
         box = ResearchDataUploadBox(
             state=ResearchDataUploadBoxState.OPEN,
-            title=request.title,
-            description=request.description,
+            title=title,
+            description=description,
             last_changed=now_utc_ms_prec(),
             changed_by=user_id,
             file_upload_box_id=file_upload_box_id,
-            storage_alias=request.storage_alias,
+            storage_alias=storage_alias,
         )
 
         # Store in repository & create audit record
@@ -157,6 +158,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Raises:
             BoxNotFoundError: If the box doesn't exist.
         """
+        # TODO: Test this method after adding audit record
         # Verify the upload box exists
         await self._box_dao.get_by_id(request.box_id)
 
@@ -166,7 +168,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
             iva_id=request.iva_id,
             box_id=request.box_id,
         )
-        # TODO: Create audit record?
+        # TODO: Create audit record
 
     async def get_upload_box_files(
         self,
@@ -184,7 +186,10 @@ class UploadOrchestrator(UploadOrchestratorPort):
             UCSCallError: if there's a problem querying the UCS.
         """
         # Verify access
-        upload_box = await self._box_dao.get_by_id(box_id)
+        try:
+            upload_box = await self._box_dao.get_by_id(box_id)
+        except ResourceNotFoundError as err:
+            raise self.BoxNotFoundError(box_id=box_id) from err
 
         is_data_steward = "data_steward" in auth_context.roles
         user_id = UUID(auth_context.id)
@@ -224,7 +229,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
             # Conditionally update data
             if updated_model.model_dump() != research_data_upload_box.model_dump():
-                await self._box_dao.update(research_data_upload_box)
+                await self._box_dao.update(updated_model)
         except NoHitsFoundError:
             # This might happen during initial creation - ignore
             log.info(
