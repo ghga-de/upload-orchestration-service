@@ -51,6 +51,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     regular_user_id = uuid4()
     iva_id = uuid4()
     file_upload_box_id = uuid4()
+    audit_topic = joint_fixture.config.audit_record_topic
 
     # Create auth contexts
     iat = now_utc_ms_prec() - timedelta(hours=1)
@@ -79,12 +80,20 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         status_code=201,
         json=str(file_upload_box_id),
     )
-    box_id = await joint_fixture.upload_orchestrator.create_research_data_upload_box(
-        title="Test Box",
-        description="A test upload box",
-        storage_alias="test-storage",
-        user_id=ds_user_id,
-    )
+    async with joint_fixture.kafka.record_events(
+        in_topic=audit_topic
+    ) as event_recorder:
+        box_id = (
+            await joint_fixture.upload_orchestrator.create_research_data_upload_box(
+                title="Test Box",
+                description="A test upload box",
+                storage_alias="test-storage",
+                user_id=ds_user_id,
+            )
+        )
+    assert event_recorder.recorded_events
+    audit_event = event_recorder.recorded_events[0]
+    assert audit_event.payload["label"] == "ResearchDataUploadBox created"  # suffices
     assert box_id is not None
 
     # 2. Granting a user access to said box
@@ -113,11 +122,17 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         url=f"{access_url}/upload-access/users/{ds_user_id}/boxes/{box_id}",
         status_code=200,
     )
-    await joint_fixture.upload_orchestrator.update_research_data_upload_box(
-        box_id=box_id,
-        request=update_request,
-        auth_context=ds_auth_context,
-    )
+    async with joint_fixture.kafka.record_events(
+        in_topic=audit_topic
+    ) as event_recorder:
+        await joint_fixture.upload_orchestrator.update_research_data_upload_box(
+            box_id=box_id,
+            request=update_request,
+            auth_context=ds_auth_context,
+        )
+    assert event_recorder.recorded_events
+    audit_event = event_recorder.recorded_events[0]
+    assert audit_event.payload["label"] == "ResearchDataUploadBox updated"
 
     # 4. Receiving a FileUploadBox update event from kafka (which belongs to the box)
     file_upload_box_event = {
