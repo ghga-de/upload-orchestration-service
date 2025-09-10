@@ -107,7 +107,7 @@ async def test_get_research_data_upload_box(
 
         # normal response (patch mock)
         box = ResearchDataUploadBox(
-            state="open",
+            state="open",  # type: ignore
             title="test",
             description="desc",
             last_changed=now_utc_ms_prec(),

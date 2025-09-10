@@ -16,6 +16,7 @@
 """Testing for listening to FileUploadBox events"""
 
 from datetime import timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -137,7 +138,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert audit_event.payload["label"] == "ResearchDataUploadBox updated"
 
     # 4. Receiving a FileUploadBox update event from kafka (which belongs to the box)
-    file_upload_box_event = {
+    file_upload_box_event: dict[str, Any] = {
         "id": str(file_upload_box_id),
         "locked": False,
         "file_count": 3,

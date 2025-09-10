@@ -56,7 +56,7 @@ def rig(config: ConfigFixture) -> JointRig:
     access_client_mock = AsyncMock()
 
     controller = UploadOrchestrator(
-        box_dao=(box_dao := InMemBoxDao()),
+        box_dao=(box_dao := InMemBoxDao()),  # type: ignore
         ucs_client=ucs_client_mock,
         access_client=access_client_mock,
         audit_repository=AsyncMock(),

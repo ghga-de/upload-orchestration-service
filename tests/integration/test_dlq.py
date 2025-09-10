@@ -15,6 +15,7 @@
 
 """Testing for DLQ functionality"""
 
+from typing import Any
 from unittest.mock import AsyncMock
 from uuid import UUID
 
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.asyncio()
 UPSERTED = "upserted"
 
 TEST_UCS_BOX_ID = UUID("f139ab68-56cc-4ca1-8866-2ffc8f297728")
-TEST_PAYLOAD = {
+TEST_PAYLOAD: dict[str, Any] = {
     "id": str(TEST_UCS_BOX_ID),
     "locked": False,
     "file_count": 0,
