@@ -106,7 +106,7 @@ class AccessClient(AccessClientPort):
         Raises:
             AccessAPIError if there's a problem during the operation.
         """
-        url = f"/upload-access/users/{user_id}/boxes"
+        url = f"{self._access_url}/upload-access/users/{user_id}/boxes"
         response = httpx.get(url)
         if response.status_code != 200:
             log.error(
