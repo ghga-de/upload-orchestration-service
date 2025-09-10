@@ -164,7 +164,6 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Raises:
             BoxNotFoundError: If the box doesn't exist.
         """
-        # TODO: Test this method after adding audit record
         # Verify the upload box exists
         await self._box_dao.get_by_id(box_id)
 
@@ -176,7 +175,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
             valid_from=validity.valid_from,
             valid_until=validity.valid_until,
         )
-        # TODO: Create audit record
+        await self._audit_repository.log_access_granted(
+            box_id=box_id, grantor_id=granting_user_id, grantee_id=user_id
+        )
+        log.info(
+            "Access grant operation successful for user %s and box %s", user_id, box_id
+        )
 
     async def get_upload_box_files(
         self,

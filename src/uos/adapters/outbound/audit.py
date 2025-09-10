@@ -84,5 +84,19 @@ class AuditRepository(AuditRepositoryPort):
             entity_id=str(box.id),
         )
 
+    async def log_access_granted(
+        self, *, box_id: UUID4, grantor_id: UUID4, grantee_id: UUID4
+    ):
+        """Log that a user was granted access to a ResearchDataUploadBox"""
+        await self.create_audit_record(
+            label="Access granted to ResearchDataUploadBox",
+            description=f"User {grantee_id} was granted access by user {grantor_id}"
+            + f" to ResearchDataUploadBox {box_id}.",
+            user_id=grantor_id,
+            action=None,
+            entity=ResearchDataUploadBox.__name__,
+            entity_id=str(box_id),
+        )
+
     # TODO: How should we log reads? If we log every result from search, we could
     #  end up with a ton of meaningless logs

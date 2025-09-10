@@ -52,3 +52,9 @@ class AuditRepositoryPort(ABC):
     ) -> None:
         """Log changes made to a ResearchDataUploadBox"""
         ...
+
+    @abstractmethod
+    async def log_access_granted(
+        self, *, box_id: UUID4, grantor_id: UUID4, grantee_id: UUID4
+    ):
+        """Log that a user was granted access to a ResearchDataUploadBox"""
