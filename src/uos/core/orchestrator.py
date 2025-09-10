@@ -25,8 +25,8 @@ from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
 from uos.core.models import (
+    ClaimValidity,
     FileUploadBox,
-    GrantAccessRequest,
     ResearchDataUploadBox,
     ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
@@ -153,7 +153,10 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
     async def grant_upload_access(
         self,
-        request: GrantAccessRequest,
+        user_id: UUID4,
+        iva_id: UUID4,
+        box_id: UUID4,
+        validity: ClaimValidity,
         granting_user_id: UUID4,
     ) -> None:
         """Grant upload access to a user for a specific upload box.
@@ -163,13 +166,15 @@ class UploadOrchestrator(UploadOrchestratorPort):
         """
         # TODO: Test this method after adding audit record
         # Verify the upload box exists
-        await self._box_dao.get_by_id(request.box_id)
+        await self._box_dao.get_by_id(box_id)
 
         # Grant access via Claims Repository Service (errors handled by access client)
         await self._access_client.grant_upload_access(
-            user_id=request.user_id,
-            iva_id=request.iva_id,
-            box_id=request.box_id,
+            user_id=user_id,
+            iva_id=iva_id,
+            box_id=box_id,
+            valid_from=validity.valid_from,
+            valid_until=validity.valid_until,
         )
         # TODO: Create audit record
 

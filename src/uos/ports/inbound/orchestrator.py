@@ -22,8 +22,8 @@ from ghga_service_commons.auth.ghga import AuthContext
 from pydantic import UUID4
 
 from uos.core.models import (
+    ClaimValidity,
     FileUploadBox,
-    GrantAccessRequest,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
@@ -84,7 +84,10 @@ class UploadOrchestratorPort(ABC):
     @abstractmethod
     async def grant_upload_access(
         self,
-        request: GrantAccessRequest,
+        user_id: UUID4,
+        iva_id: UUID4,
+        box_id: UUID4,
+        validity: ClaimValidity,
         granting_user_id: UUID4,
     ) -> None:
         """Grant upload access to a user for a specific upload box.

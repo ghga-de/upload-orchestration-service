@@ -47,7 +47,6 @@
     },
     "ucs_public_key": {
       "description": "The public key used to encrypt work order tokens sent to the UCS",
-      "examples": [],
       "title": "Ucs Public Key",
       "type": "string"
     },

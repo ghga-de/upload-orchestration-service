@@ -25,7 +25,7 @@ from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
 from uos.core.models import (
-    GrantAccessRequest,
+    ClaimValidity,
     ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
 )
@@ -97,18 +97,20 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert box_id is not None
 
     # 2. Granting a user access to said box
-    grant_request = GrantAccessRequest(
-        user_id=regular_user_id,
-        iva_id=iva_id,
-        box_id=box_id,
-    )
     httpx_mock.add_response(
-        method="GET",
+        method="POST",
         url=f"{access_url}/upload-access/users/{regular_user_id}/ivas/{iva_id}/boxes/{box_id}",
         status_code=200,
     )
+    validity = ClaimValidity(
+        valid_from=now_utc_ms_prec(),
+        valid_until=now_utc_ms_prec() + timedelta(days=7),
+    )
     await joint_fixture.upload_orchestrator.grant_upload_access(
-        request=grant_request,
+        user_id=regular_user_id,
+        iva_id=iva_id,
+        box_id=box_id,
+        validity=validity,
         granting_user_id=ds_user_id,
     )
 

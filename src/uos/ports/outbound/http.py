@@ -17,6 +17,7 @@
 
 from abc import ABC, abstractmethod
 
+from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
 
@@ -28,7 +29,13 @@ class AccessClientPort(ABC):
 
     @abstractmethod
     async def grant_upload_access(
-        self, *, user_id: UUID4, iva_id: UUID4, box_id: UUID4
+        self,
+        *,
+        user_id: UUID4,
+        iva_id: UUID4,
+        box_id: UUID4,
+        valid_from: UTCDatetime,
+        valid_until: UTCDatetime,
     ) -> None:
         """Grant upload access to a user for a box.
 

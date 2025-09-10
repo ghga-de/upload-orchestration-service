@@ -15,9 +15,11 @@
 
 """Unit tests for the access client"""
 
+from datetime import timedelta
 from uuid import UUID, uuid4
 
 import pytest
+from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures import ConfigFixture
@@ -28,6 +30,8 @@ pytestmark = pytest.mark.asyncio()
 TEST_USER_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
 TEST_IVA_ID = UUID("8f9b2d54-bccc-42e9-8df4-7df5c5c610d2")
 TEST_BOX_ID = UUID("05bbc2ea-d718-4d05-b7b0-1e14b19b90d8")
+VALID_FROM = now_utc_ms_prec() - timedelta(minutes=5)
+VALID_UNTIL = VALID_FROM + timedelta(minutes=5)
 
 
 async def test_grant_upload_access(config: ConfigFixture, httpx_mock: HTTPXMock):
@@ -37,28 +41,44 @@ async def test_grant_upload_access(config: ConfigFixture, httpx_mock: HTTPXMock)
     # Happy path
     httpx_mock.add_response(200)
     await access_client.grant_upload_access(
-        user_id=TEST_USER_ID, iva_id=TEST_IVA_ID, box_id=TEST_BOX_ID
+        user_id=TEST_USER_ID,
+        iva_id=TEST_IVA_ID,
+        box_id=TEST_BOX_ID,
+        valid_from=VALID_FROM,
+        valid_until=VALID_UNTIL,
     )  # no error == success
 
     # Check off-normal status code
     httpx_mock.add_response(500, json={"error": "Some error occurred."})
     with pytest.raises(AccessClient.AccessAPIError):
         await access_client.grant_upload_access(
-            user_id=TEST_USER_ID, iva_id=TEST_IVA_ID, box_id=TEST_BOX_ID
+            user_id=TEST_USER_ID,
+            iva_id=TEST_IVA_ID,
+            box_id=TEST_BOX_ID,
+            valid_from=VALID_FROM,
+            valid_until=VALID_UNTIL,
         )
 
     # Check 403 status code
     httpx_mock.add_response(403, json={"error": "Forbidden"})
     with pytest.raises(AccessClient.AccessAPIError):
         await access_client.grant_upload_access(
-            user_id=TEST_USER_ID, iva_id=TEST_IVA_ID, box_id=TEST_BOX_ID
+            user_id=TEST_USER_ID,
+            iva_id=TEST_IVA_ID,
+            box_id=TEST_BOX_ID,
+            valid_from=VALID_FROM,
+            valid_until=VALID_UNTIL,
         )
 
     # Check 404 status code
     httpx_mock.add_response(404, json={"error": "Not found"})
     with pytest.raises(AccessClient.AccessAPIError):
         await access_client.grant_upload_access(
-            user_id=TEST_USER_ID, iva_id=TEST_IVA_ID, box_id=TEST_BOX_ID
+            user_id=TEST_USER_ID,
+            iva_id=TEST_IVA_ID,
+            box_id=TEST_BOX_ID,
+            valid_from=VALID_FROM,
+            valid_until=VALID_UNTIL,
         )
 
 

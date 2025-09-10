@@ -14,6 +14,7 @@
 # limitations under the License.
 """Tests that check the REST API's behavior and auth handling"""
 
+from datetime import timedelta
 from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
@@ -300,6 +301,10 @@ async def test_grant_upload_access(
             "user_id": str(uuid4()),
             "iva_id": str(uuid4()),
             "box_id": str(TEST_BOX_ID),
+            "validity": {
+                "valid_from": now_utc_ms_prec().isoformat(),
+                "valid_until": (now_utc_ms_prec() + timedelta(minutes=180)).isoformat(),
+            },
         }
 
         # unauthenticated

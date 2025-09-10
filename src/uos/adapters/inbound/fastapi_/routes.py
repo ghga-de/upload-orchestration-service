@@ -177,7 +177,10 @@ async def grant_upload_access(
 
     try:
         await upload_service.grant_upload_access(
-            request=request,
+            user_id=request.user_id,
+            iva_id=request.iva_id,
+            box_id=request.box_id,
+            validity=request.validity,
             granting_user_id=UUID(auth_context.id),
         )
         return {"message": "Upload access granted successfully"}

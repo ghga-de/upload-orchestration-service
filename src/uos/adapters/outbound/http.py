@@ -20,6 +20,7 @@ from uuid import UUID
 
 import httpx
 from ghga_service_commons.utils.crypt import encrypt
+from ghga_service_commons.utils.utc_dates import UTCDatetime
 from jwcrypto import jwk
 from pydantic import UUID4, Field, SecretStr
 from pydantic_settings import BaseSettings
@@ -64,7 +65,6 @@ class UCSApiConfig(BaseSettings):
     ucs_public_key: str = Field(
         ...,
         description="The public key used to encrypt work order tokens sent to the UCS",
-        examples=[],  # TODO: fill in this and check the type-hint
     )
 
 
@@ -75,7 +75,13 @@ class AccessClient(AccessClientPort):
         self._access_url = config.access_url
 
     async def grant_upload_access(
-        self, *, user_id: UUID4, iva_id: UUID4, box_id: UUID4
+        self,
+        *,
+        user_id: UUID4,
+        iva_id: UUID4,
+        box_id: UUID4,
+        valid_from: UTCDatetime,
+        valid_until: UTCDatetime,
     ) -> None:
         """Grant upload access to a user for a box.
 
@@ -86,7 +92,12 @@ class AccessClient(AccessClientPort):
             f"{self._access_url}/upload-access/users"
             + f"/{user_id}/ivas/{iva_id}/boxes/{box_id}"
         )
-        response = httpx.get(url)
+        body = {
+            "valid_from": valid_from.isoformat(),
+            "valid_until": valid_until.isoformat(),
+        }
+
+        response = httpx.post(url, json=body)
         if response.status_code != 200:
             log.error(
                 "Failed to grant upload access for user %s to box %s.",
@@ -94,6 +105,8 @@ class AccessClient(AccessClientPort):
                     "user_id": user_id,
                     "iva_id": iva_id,
                     "box_id": box_id,
+                    "valid_from": valid_from,
+                    "valid_until": valid_until,
                     "status_code": response.status_code,
                     "response_text": response.text,
                 },

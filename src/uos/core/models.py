@@ -15,12 +15,19 @@
 
 """Data models for the Upload Orchestration Service."""
 
-from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
+from ghga_service_commons.utils.utc_dates import UTCDatetime
 from hexkit.protocols.dao import UUID4Field
-from pydantic import UUID4, BaseModel, ConfigDict, Field
+from pydantic import (
+    UUID4,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+)
 
 
 class FileUploadBox(BaseModel):
@@ -72,7 +79,7 @@ class ResearchDataUploadBox(BaseModel):
     )
     title: str = Field(..., description="Short meaningful name for the box")
     description: str = Field(..., description="Describes the upload box in more detail")
-    last_changed: datetime = Field(..., description="Timestamp of the latest change")
+    last_changed: UTCDatetime = Field(..., description="Timestamp of the latest change")
     changed_by: UUID4 = Field(
         ..., description="ID of the user who performed the latest change"
     )
@@ -90,7 +97,9 @@ class AuditRecord(BaseModel):
     """A generic record for audit purposes."""
 
     id: UUID4 = UUID4Field(description="A unique identifier for the record")
-    created: datetime = Field(..., description="Timestamp when the record was created")
+    created: UTCDatetime = Field(
+        ..., description="Timestamp when the record was created"
+    )
     service: str = Field(
         ..., description="Name of the service that generated the record"
     )
@@ -165,11 +174,34 @@ class UpdateUploadBoxRequest(BaseModel):
     )
 
 
+class ClaimValidity(BaseModel):
+    """Start and end dates for validating claims."""
+
+    valid_from: UTCDatetime = Field(
+        default=...,
+        description="Start date of validity",
+        examples=["2023-01-01T00:00:00Z"],
+    )
+    valid_until: UTCDatetime = Field(
+        default=...,
+        description="End date of validity",
+        examples=["2023-12-31T23:59:59Z"],
+    )
+
+    @field_validator("valid_until")
+    @classmethod
+    def period_is_valid(cls, value: UTCDatetime, info: ValidationInfo):
+        """Validate that the dates of the period are in the right order."""
+        data = info.data
+        if "valid_from" in data and value <= data["valid_from"]:
+            raise ValueError("'valid_until' must be later than 'valid_from'")
+        return value
+
+
 class GrantAccessRequest(BaseModel):
     """Request model for granting upload access to a user."""
 
-    # TODO: Add any other fields here that might be needed. Look at CRS for format
-
+    validity: ClaimValidity
     user_id: UUID4 = Field(..., description="ID of the user to grant access to")
     iva_id: UUID4 = Field(..., description="ID of the IVA verification")
     box_id: UUID4 = Field(..., description="ID of the upload box")
