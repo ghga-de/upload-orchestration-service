@@ -1,6 +1,6 @@
 [project]
 name = "uos"
-version = "0.1.0"
+version = "1.0.0"
 description = "Upload Orchestration Service - A service providing a web-accessible management and auth layer over upload-path file services."
 dependencies = [
     "typer >= 0.15",
