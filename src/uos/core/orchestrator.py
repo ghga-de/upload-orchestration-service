@@ -241,7 +241,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
                     },
                 )
                 continue
-        return grants_with_info
+        # Sort grants by id in ascending order for predictability
+        return sorted(grants_with_info, key=lambda x: x.id)
 
     async def get_upload_box_files(
         self,
@@ -282,7 +283,9 @@ class UploadOrchestrator(UploadOrchestratorPort):
         file_ids = await self._ucs_client.get_file_upload_list(
             box_id=upload_box.file_upload_box_id,
         )
-        return file_ids
+
+        # Sort files by ID for predictability
+        return sorted(file_ids)
 
     async def upsert_file_upload_box(self, file_upload_box: FileUploadBox) -> None:
         """Handle FileUploadBox update events from UCS.

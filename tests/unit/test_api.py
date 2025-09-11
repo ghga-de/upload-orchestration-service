@@ -24,7 +24,7 @@ from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
-from uos.core.models import ResearchDataUploadBox
+from uos.core.models import GrantWithBoxInfo, ResearchDataUploadBox
 from uos.inject import prepare_rest_app
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.http import UCSClientPort
@@ -288,7 +288,7 @@ async def test_update_research_data_upload_box(
 async def test_grant_upload_access(
     config: ConfigFixture, ds_auth_headers, user_auth_headers, bad_auth_headers
 ):
-    """Test the POST /access-grant endpoint"""
+    """Test the POST /access-grants endpoint"""
     orchestrator = AsyncMock()
     async with (
         prepare_rest_app(
@@ -296,7 +296,7 @@ async def test_grant_upload_access(
         ) as app,
         AsyncTestClient(app=app) as rest_client,
     ):
-        url = "/access-grant"
+        url = "/access-grants"
         request_data = {
             "user_id": str(uuid4()),
             "iva_id": str(uuid4()),
@@ -394,4 +394,114 @@ async def test_list_upload_box_files(
         orchestrator.reset_mock()
         orchestrator.get_upload_box_files.side_effect = TypeError()
         response = await rest_client.get(url, headers=user_auth_headers)
+        assert response.status_code == 500
+
+
+async def test_revoke_upload_access_grant(
+    config: ConfigFixture, ds_auth_headers, user_auth_headers, bad_auth_headers
+):
+    """Test the DELETE /access-grants/{grant_id} endpoint"""
+    orchestrator = AsyncMock()
+    test_grant_id = uuid4()
+
+    async with (
+        prepare_rest_app(
+            config=config.config, upload_orchestrator_override=orchestrator
+        ) as app,
+        AsyncTestClient(app=app) as rest_client,
+    ):
+        url = f"/access-grants/{test_grant_id}"
+
+        # unauthenticated
+        response = await rest_client.delete(url)
+        assert response.status_code == 403
+
+        # bad credentials
+        response = await rest_client.delete(url, headers=bad_auth_headers)
+        assert response.status_code == 401
+
+        # normal response but user is not a data steward (no data_steward role)
+        response = await rest_client.delete(url, headers=user_auth_headers)
+        assert response.status_code == 403
+
+        # normal response with data steward role
+        orchestrator.revoke_upload_access_grant.return_value = None
+        response = await rest_client.delete(url, headers=ds_auth_headers)
+        assert response.status_code == 204
+
+        # handle grant not found error from core
+        orchestrator.reset_mock()
+        orchestrator.revoke_upload_access_grant.side_effect = (
+            UploadOrchestratorPort.GrantNotFoundError(grant_id=test_grant_id)
+        )
+        response = await rest_client.delete(url, headers=ds_auth_headers)
+        assert response.status_code == 404
+
+        # handle other exception
+        orchestrator.reset_mock()
+        orchestrator.revoke_upload_access_grant.side_effect = TypeError()
+        response = await rest_client.delete(url, headers=ds_auth_headers)
+        assert response.status_code == 500
+
+
+async def test_get_upload_access_grants(
+    config: ConfigFixture, ds_auth_headers, user_auth_headers, bad_auth_headers
+):
+    """Test the GET /access-grants endpoint"""
+    orchestrator = AsyncMock()
+    async with (
+        prepare_rest_app(
+            config=config.config, upload_orchestrator_override=orchestrator
+        ) as app,
+        AsyncTestClient(app=app) as rest_client,
+    ):
+        url = "/access-grants"
+
+        # unauthenticated
+        response = await rest_client.get(url)
+        assert response.status_code == 403
+
+        # bad credentials
+        response = await rest_client.get(url, headers=bad_auth_headers)
+        assert response.status_code == 401
+
+        # normal response but user is not a data steward (no data_steward role)
+        response = await rest_client.get(url, headers=user_auth_headers)
+        assert response.status_code == 403
+
+        test_grants = [
+            GrantWithBoxInfo(
+                id=uuid4(),
+                user_id=uuid4(),
+                iva_id=uuid4(),
+                box_id=TEST_BOX_ID,
+                created=now_utc_ms_prec(),
+                valid_from=now_utc_ms_prec(),
+                valid_until=now_utc_ms_prec() + timedelta(days=7),
+                user_name="Test User",
+                user_email="test@example.com",
+                user_title="Dr.",
+                title="Test Box",
+                description="Test box description",
+            )
+        ]
+        orchestrator.get_upload_access_grants.return_value = test_grants
+        response = await rest_client.get(url, headers=ds_auth_headers)
+        assert response.status_code == 200
+        assert response.json() == [
+            grant.model_dump(mode="json") for grant in test_grants
+        ]
+
+        # test with query parameters
+        response = await rest_client.get(
+            url,
+            headers=ds_auth_headers,
+            params={"user_id": str(uuid4()), "valid": "true"},
+        )
+        assert response.status_code == 200
+
+        # handle other exception
+        orchestrator.reset_mock()
+        orchestrator.get_upload_access_grants.side_effect = TypeError()
+        response = await rest_client.get(url, headers=ds_auth_headers)
         assert response.status_code == 500

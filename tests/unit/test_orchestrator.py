@@ -386,3 +386,137 @@ async def test_get_research_data_upload_box_not_found(rig: JointRig):
 
     # Verify access check was called first
     rig.access_client.check_box_access.assert_called_once()  # type: ignore
+
+
+async def test_get_upload_access_grants_happy(rig: JointRig):
+    """Test the normal path for getting upload access grants."""
+    # First create a research data upload box
+    box_id = await rig.controller.create_research_data_upload_box(
+        title="Test Box",
+        description="Test Description",
+        storage_alias="HD01",
+        user_id=TEST_DS_ID,
+    )
+
+    # Create mock upload grants that would be returned by access client
+    test_user_id = uuid4()
+    test_iva_id = uuid4()
+    test_grant_id = uuid4()
+
+    mock_grants = [
+        models.UploadGrant(
+            id=test_grant_id,
+            user_id=test_user_id,
+            iva_id=test_iva_id,
+            box_id=box_id,
+            created=now_utc_ms_prec(),
+            valid_from=now_utc_ms_prec(),
+            valid_until=now_utc_ms_prec() + timedelta(days=7),
+            user_name="Test User",
+            user_email="test@example.com",
+            user_title="Dr.",
+        )
+    ]
+
+    # Mock the access client to return these grants
+    rig.access_client.get_upload_access_grants.return_value = mock_grants  # type: ignore
+
+    # Call the method
+    result = await rig.controller.get_upload_access_grants(
+        user_id=test_user_id,
+        iva_id=test_iva_id,
+        box_id=box_id,
+        valid=True,
+    )
+
+    # Verify the results
+    assert len(result) == 1
+    grant_with_info = result[0]
+    assert grant_with_info.id == test_grant_id
+    assert grant_with_info.user_id == test_user_id
+    assert grant_with_info.iva_id == test_iva_id
+    assert grant_with_info.box_id == box_id
+    assert grant_with_info.user_name == "Test User"
+    assert grant_with_info.user_email == "test@example.com"
+    assert grant_with_info.user_title == "Dr."
+    # These should come from the box
+    assert grant_with_info.title == "Test Box"
+    assert grant_with_info.description == "Test Description"
+
+    # Verify access client was called with correct parameters
+    rig.access_client.get_upload_access_grants.assert_called_once_with(  # type: ignore
+        user_id=test_user_id,
+        iva_id=test_iva_id,
+        box_id=box_id,
+        valid=True,
+    )
+
+
+async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
+    """Test the case where grants returned from the access API include a grant with
+    a box ID that doesn't exist in the UOS. This test also checks that we emit a
+    WARNING log (but don't raise an error).
+    """
+    # Create one valid box
+    valid_box_id = await rig.controller.create_research_data_upload_box(
+        title="Valid Box",
+        description="Valid Description",
+        storage_alias="HD01",
+        user_id=TEST_DS_ID,
+    )
+
+    # Create mock upload grants - one with a valid box ID, one with an invalid box ID
+    test_user_id = uuid4()
+    invalid_box_id = uuid4()  # This box doesn't/won't exist
+
+    mock_grants = [
+        models.UploadGrant(
+            id=uuid4(),
+            user_id=test_user_id,
+            iva_id=uuid4(),
+            box_id=valid_box_id,  # This box exists
+            created=now_utc_ms_prec(),
+            valid_from=now_utc_ms_prec(),
+            valid_until=now_utc_ms_prec() + timedelta(days=7),
+            user_name="Test User",
+            user_email="test@example.com",
+            user_title="Dr.",
+        ),
+        models.UploadGrant(
+            id=uuid4(),
+            user_id=test_user_id,
+            iva_id=uuid4(),
+            box_id=invalid_box_id,  # This box doesn't exist
+            created=now_utc_ms_prec(),
+            valid_from=now_utc_ms_prec(),
+            valid_until=now_utc_ms_prec() + timedelta(days=7),
+            user_name="Test User 2",
+            user_email="test2@example.com",
+            user_title="Prof.",
+        ),
+    ]
+
+    # Mock the access client to return these grants
+    rig.access_client.get_upload_access_grants.return_value = mock_grants  # type: ignore
+
+    # Call the method
+    result = await rig.controller.get_upload_access_grants()
+
+    # Verify the results - should only contain the grant with the valid box
+    assert len(result) == 1
+    grant_with_info = result[0]
+    assert grant_with_info.box_id == valid_box_id
+    assert grant_with_info.title == "Valid Box"
+    assert grant_with_info.description == "Valid Description"
+
+    # Verify a warning was logged for the invalid box
+    assert caplog.records
+    warning_messages = [
+        record.message for record in caplog.records if record.levelname == "WARNING"
+    ]
+    assert len(warning_messages) >= 1
+    assert any(str(invalid_box_id) in msg for msg in warning_messages)
+    assert any("doesn't exist in UOS" in msg for msg in warning_messages)
+
+    # Verify access client was called
+    rig.access_client.get_upload_access_grants.assert_called_once()  # type: ignore
