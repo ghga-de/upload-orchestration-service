@@ -20,12 +20,17 @@ from abc import ABC, abstractmethod
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
+from uos.core.models import UploadGrant
+
 
 class AccessClientPort(ABC):
     """An adapter for interacting with the access API to manage upload access claims"""
 
     class AccessAPIError(RuntimeError):
         """Raised when there's an error while communicating with the Access API"""
+
+    class GrantNotFoundError(RuntimeError):
+        """Raise when an the access API reports that it failed to find a grant."""
 
     @abstractmethod
     async def grant_upload_access(
@@ -40,7 +45,32 @@ class AccessClientPort(ABC):
         """Grant upload access to a user for a box.
 
         Raises:
-            AccessAPIError if there's a problem during the operation.
+            AccessAPIError: if there's a problem during the operation.
+        """
+        ...
+
+    @abstractmethod
+    async def revoke_upload_access(self, *, grant_id: UUID4) -> None:
+        """Revoke a user's access to an upload box.
+
+        Raises:
+            GrantNotFoundError: if the grant wasn't found.
+            AccessAPIError: if there's a problem during the operation.
+        """
+
+    @abstractmethod
+    async def get_upload_access_grants(
+        self,
+        *,
+        user_id: UUID4 | None = None,
+        iva_id: UUID4 | None = None,
+        box_id: UUID4 | None = None,
+        valid: bool | None = None,
+    ) -> list[UploadGrant]:
+        """Get a list of upload grants.
+
+        Raises:
+            AccessAPIError: if there's a problem during the operation.
         """
         ...
 
@@ -49,7 +79,7 @@ class AccessClientPort(ABC):
         """Get list of upload box IDs accessible to a user.
 
         Raises:
-            AccessAPIError if there's a problem during the operation.
+            AccessAPIError: if there's a problem during the operation.
         """
         ...
 
@@ -58,7 +88,7 @@ class AccessClientPort(ABC):
         """Check if a user has access to a specific upload box.
 
         Raises:
-            AccessAPIError if there's a problem during the operation.
+            AccessAPIError: if there's a problem during the operation.
         """
         ...
 

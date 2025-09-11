@@ -40,6 +40,25 @@ class HttpBoxNotFoundError(HttpCustomExceptionBase):
         )
 
 
+class HttpGrantNotFoundError(HttpCustomExceptionBase):
+    """Thrown when an upload access grant with given ID could not be found."""
+
+    exception_id = "grantNotFound"
+
+    class DataModel(BaseModel):
+        """Model for exception data"""
+
+        grant_id: UUID4
+
+    def __init__(self, *, grant_id: UUID4, status_code: int = 404):
+        """Construct message and init the exception."""
+        super().__init__(
+            status_code=status_code,
+            description=(f"Upload access grant with ID {grant_id} not found."),
+            data={"grant_id": str(grant_id)},
+        )
+
+
 class HttpNotAuthorizedError(HttpCustomExceptionBase):
     """Thrown when the user is not authorized to perform the requested action."""
 

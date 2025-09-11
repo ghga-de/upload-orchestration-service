@@ -24,6 +24,7 @@ from pydantic import (
     UUID4,
     BaseModel,
     ConfigDict,
+    EmailStr,
     Field,
     ValidationInfo,
     field_validator,
@@ -205,3 +206,37 @@ class GrantAccessRequest(BaseModel):
     user_id: UUID4 = Field(..., description="ID of the user to grant access to")
     iva_id: UUID4 = Field(..., description="ID of the IVA verification")
     box_id: UUID4 = Field(..., description="ID of the upload box")
+
+
+class UploadGrant(BaseModel):
+    """An upload access grant."""
+
+    id: UUID4 = Field(..., description="Internal grant ID (same as claim ID)")
+    user_id: UUID4 = Field(default=..., description="Internal user ID")
+    iva_id: UUID4 | None = Field(
+        default=None, description="ID of an IVA associated with this grant"
+    )
+    box_id: UUID4 = Field(
+        default=..., description="ID of the upload box this grant is for"
+    )
+    created: UTCDatetime = Field(
+        default=..., description="Date of creation of this grant"
+    )
+    valid_from: UTCDatetime = Field(default=..., description="Start date of validity")
+    valid_until: UTCDatetime = Field(default=..., description="End date of validity")
+
+    user_name: str = Field(default=..., description="Full name of the user")
+    user_email: EmailStr = Field(
+        default=...,
+        description="The email address of the user",
+    )
+    user_title: str | None = Field(
+        default=None, description="Academic title of the user"
+    )
+
+
+class GrantWithBoxInfo(UploadGrant):
+    """An UploadGrant with the ResearchDataUploadBox title and description."""
+
+    title: str = Field(..., description="Short meaningful name for the box")
+    description: str = Field(..., description="Describes the upload box in more detail")

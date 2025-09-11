@@ -72,6 +72,82 @@ components:
       - box_id
       title: GrantAccessRequest
       type: object
+    GrantWithBoxInfo:
+      description: An UploadGrant with the ResearchDataUploadBox title and description.
+      properties:
+        box_id:
+          description: ID of the upload box this grant is for
+          format: uuid4
+          title: Box Id
+          type: string
+        created:
+          description: Date of creation of this grant
+          format: date-time
+          title: Created
+          type: string
+        description:
+          description: Describes the upload box in more detail
+          title: Description
+          type: string
+        id:
+          description: Internal grant ID (same as claim ID)
+          format: uuid4
+          title: Id
+          type: string
+        iva_id:
+          anyOf:
+          - format: uuid4
+            type: string
+          - type: 'null'
+          description: ID of an IVA associated with this grant
+          title: Iva Id
+        title:
+          description: Short meaningful name for the box
+          title: Title
+          type: string
+        user_email:
+          description: The email address of the user
+          format: email
+          title: User Email
+          type: string
+        user_id:
+          description: Internal user ID
+          format: uuid4
+          title: User Id
+          type: string
+        user_name:
+          description: Full name of the user
+          title: User Name
+          type: string
+        user_title:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Academic title of the user
+          title: User Title
+        valid_from:
+          description: Start date of validity
+          format: date-time
+          title: Valid From
+          type: string
+        valid_until:
+          description: End date of validity
+          format: date-time
+          title: Valid Until
+          type: string
+      required:
+      - id
+      - user_id
+      - box_id
+      - created
+      - valid_from
+      - valid_until
+      - user_name
+      - user_email
+      - title
+      - description
+      title: GrantWithBoxInfo
+      type: object
     HTTPValidationError:
       properties:
         detail:
@@ -210,12 +286,81 @@ info:
   version: 1.0.0
 openapi: 3.1.0
 paths:
-  /access-grant:
+  /access-grants:
+    get:
+      description: Endpoint to get the list of all upload access grants. Can be filtered
+        by user ID, IVA ID, and box ID.
+      operationId: get_upload_access_grants_access_grants_get
+      parameters:
+      - description: The internal ID of the user
+        in: query
+        name: user_id
+        required: false
+        schema:
+          anyOf:
+          - format: uuid4
+            type: string
+          - type: 'null'
+          description: The internal ID of the user
+          title: User Id
+      - description: The ID of the IVA
+        in: query
+        name: iva_id
+        required: false
+        schema:
+          anyOf:
+          - format: uuid4
+            type: string
+          - type: 'null'
+          description: The ID of the IVA
+          title: Iva Id
+      - description: The ID of the upload box
+        in: query
+        name: box_id
+        required: false
+        schema:
+          anyOf:
+          - format: uuid4
+            type: string
+          - type: 'null'
+          description: The ID of the upload box
+          title: Box Id
+      - description: Whether the grant is currently valid
+        in: query
+        name: valid
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Whether the grant is currently valid
+          title: Valid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/GrantWithBoxInfo'
+                title: Response 200 Get Upload Access Grants Access Grants Get
+                type: array
+          description: Upload access grants have been fetched.
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Get upload access grants
+      tags:
+      - UploadOrchestrationService
     post:
       description: Grant upload access to a user for a single research data upload
         box. Users cannot upload any files until they have been granted access to
         a box.
-      operationId: grant_upload_access_access_grant_post
+      operationId: grant_upload_access_access_grants_post
       requestBody:
         content:
           application/json:
@@ -239,6 +384,32 @@ paths:
       summary: Grant upload access
       tags:
       - UploadOrchestrationService
+  /access-grants/{grant_id}:
+    delete:
+      description: Revokes an existing upload access grant.
+      operationId: revoke_upload_access_grant_access_grants__grant_id__delete
+      parameters:
+      - in: path
+        name: grant_id
+        required: true
+        schema:
+          format: uuid4
+          title: Grant Id
+          type: string
+      responses:
+        '204':
+          description: Upload access grant has been revoked.
+        '404':
+          description: The upload access grant was not found.
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: Revoke an upload access grant
   /boxes:
     post:
       description: Create a new research data upload box to label and track related

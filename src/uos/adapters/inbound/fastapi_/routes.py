@@ -17,15 +17,17 @@
 
 import logging
 from enum import Enum
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 from pydantic import UUID4
 
 from uos.adapters.inbound.fastapi_.auth import UserAuthContext
 from uos.adapters.inbound.fastapi_.dummies import UploadOrchestratorDummy
 from uos.adapters.inbound.fastapi_.http_exceptions import (
     HttpBoxNotFoundError,
+    HttpGrantNotFoundError,
     HttpInternalError,
     HttpNotAuthorizedError,
 )
@@ -33,6 +35,7 @@ from uos.constants import TRACER
 from uos.core.models import (
     CreateUploadBoxRequest,
     GrantAccessRequest,
+    GrantWithBoxInfo,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
@@ -120,8 +123,9 @@ async def create_research_data_upload_box(
             user_id=UUID(auth_context.id),
         )
         return box_id
-    except Exception as exc:
-        raise HttpInternalError(message="Failed to create upload box") from exc
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to create upload box") from err
 
 
 @router.patch(
@@ -157,7 +161,7 @@ async def update_research_data_upload_box(
 
 
 @router.post(
-    "/access-grant",
+    "/access-grants",
     summary="Grant upload access",
     description="Grant upload access to a user for a single research data upload box."
     + " Users cannot upload any files until they have been granted access to a box.",
@@ -184,9 +188,107 @@ async def grant_upload_access(
             granting_user_id=UUID(auth_context.id),
         )
         return {"message": "Upload access granted successfully"}
-    except Exception as exc:
-        log.error(exc, exc_info=True)
-        raise HttpInternalError(message="Failed to grant upload access") from exc
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to grant upload access") from err
+
+
+@router.delete(
+    "/access-grants/{grant_id}",
+    summary="Revoke an upload access grant",
+    description="Revokes an existing upload access grant.",
+    responses={
+        204: {
+            "description": "Upload access grant has been revoked.",
+        },
+        404: {"description": "The upload access grant was not found."},
+    },
+    status_code=204,
+)
+@TRACER.start_as_current_span("routes.revoke_upload_access_grant")
+async def revoke_upload_access_grant(
+    grant_id: UUID4,
+    upload_service: UploadOrchestratorDummy,
+    auth_context: UserAuthContext,
+) -> None:
+    """Revoke an upload access grant."""
+    if not check_data_steward_role(auth_context):
+        raise HttpNotAuthorizedError()
+
+    try:
+        await upload_service.revoke_upload_access_grant(grant_id)
+    except UploadOrchestratorPort.GrantNotFoundError as err:
+        raise HttpGrantNotFoundError(grant_id=grant_id) from err
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to revoke access grant") from err
+
+
+@router.get(
+    "/access-grants",
+    tags=TAGS,
+    summary="Get upload access grants",
+    description="Endpoint to get the list of all upload access grants. Can be filtered by user ID, IVA ID, and box ID.",
+    responses={
+        200: {
+            "model": list[GrantWithBoxInfo],
+            "description": "Upload access grants have been fetched.",
+        },
+    },
+    status_code=200,
+)
+@TRACER.start_as_current_span("routes.get_upload_access_grants")
+async def get_upload_access_grants(  # noqa: PLR0913
+    upload_service: UploadOrchestratorDummy,
+    auth_context: UserAuthContext,
+    user_id: Annotated[
+        UUID4 | None,
+        Query(
+            ...,
+            alias="user_id",
+            description="The internal ID of the user",
+        ),
+    ] = None,
+    iva_id: Annotated[
+        UUID4 | None,
+        Query(
+            ...,
+            alias="iva_id",
+            description="The ID of the IVA",
+        ),
+    ] = None,
+    box_id: Annotated[
+        UUID4 | None,
+        Query(
+            ...,
+            alias="box_id",
+            description="The ID of the upload box",
+        ),
+    ] = None,
+    valid: Annotated[
+        bool | None,
+        Query(
+            ...,
+            alias="valid",
+            description="Whether the grant is currently valid",
+        ),
+    ] = None,
+) -> list[GrantWithBoxInfo]:
+    """Get upload access grants.
+
+    You can filter the grants by user ID, IVA ID, and box ID
+    and by whether the grant is currently valid or not.
+    """
+    if not check_data_steward_role(auth_context):
+        raise HttpNotAuthorizedError()
+
+    try:
+        return await upload_service.get_upload_access_grants(
+            user_id=user_id, iva_id=iva_id, box_id=box_id, valid=valid
+        )
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to get upload access grants") from err
 
 
 @router.get(

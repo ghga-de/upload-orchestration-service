@@ -27,6 +27,7 @@ from pydantic import UUID4
 from uos.core.models import (
     ClaimValidity,
     FileUploadBox,
+    GrantWithBoxInfo,
     ResearchDataUploadBox,
     ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
@@ -59,6 +60,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
     async def create_research_data_upload_box(
         self,
+        *,
         title: str,
         description: str,
         storage_alias: str,
@@ -100,6 +102,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
     async def update_research_data_upload_box(
         self,
+        *,
         box_id: UUID4,
         request: UpdateUploadBoxRequest,
         auth_context: AuthContext,
@@ -153,6 +156,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
     async def grant_upload_access(
         self,
+        *,
         user_id: UUID4,
         iva_id: UUID4,
         box_id: UUID4,
@@ -162,6 +166,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         """Grant upload access to a user for a specific upload box.
 
         Raises:
+            AccessAPIError: if there's a problem communicating with the access API.
             BoxNotFoundError: If the box doesn't exist.
         """
         # Verify the upload box exists
@@ -182,8 +187,65 @@ class UploadOrchestrator(UploadOrchestratorPort):
             "Access grant operation successful for user %s and box %s", user_id, box_id
         )
 
+    async def revoke_upload_access_grant(self, grant_id: UUID4) -> None:
+        """Revoke a user's access to an upload box.
+
+        Raises:
+            GrantNotFoundError: if the grant wasn't found in the access API.
+            AccessAPIError: if there's a problem communicating with the access API.
+        """
+        try:
+            await self._access_client.revoke_upload_access(grant_id=grant_id)
+        except AccessClientPort.GrantNotFoundError as err:
+            raise self.GrantNotFoundError(grant_id=grant_id) from err
+
+    async def get_upload_access_grants(
+        self,
+        *,
+        user_id: UUID4 | None = None,
+        iva_id: UUID4 | None = None,
+        box_id: UUID4 | None = None,
+        valid: bool | None = None,
+    ) -> list[GrantWithBoxInfo]:
+        """Get a list of upload grants with the associated box titles and descriptions.
+
+        Raises:
+            AccessAPIError: if there's a problem communicating with the access API.
+        """
+        grants = await self._access_client.get_upload_access_grants(
+            user_id=user_id,
+            iva_id=iva_id,
+            box_id=box_id,
+            valid=valid,
+        )
+
+        grants_with_info: list[GrantWithBoxInfo] = []
+        for grant in grants:
+            try:
+                box = await self._box_dao.get_by_id(grant.box_id)
+                grant_with_info = GrantWithBoxInfo(
+                    **grant.model_dump(), title=box.title, description=box.description
+                )
+                grants_with_info.append(grant_with_info)
+            except ResourceNotFoundError:
+                log.warning(
+                    "Access grant %s has a box ID (%s) that doesn't exist in UOS.",
+                    grant.id,
+                    grant.box_id,
+                    extra={
+                        "grant_id": grant.id,
+                        "user_id": user_id,
+                        "iva_id": iva_id,
+                        "box_id": box_id,
+                        "valid": valid,
+                    },
+                )
+                continue
+        return grants_with_info
+
     async def get_upload_box_files(
         self,
+        *,
         box_id: UUID4,
         auth_context: AuthContext,
     ) -> Sequence[UUID4]:

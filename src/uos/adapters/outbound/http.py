@@ -16,6 +16,7 @@
 """Outbound HTTP calls"""
 
 import logging
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -28,6 +29,7 @@ from pydantic_settings import BaseSettings
 from uos.core.models import (
     ChangeFileBoxWorkOrder,
     CreateFileBoxWorkOrder,
+    UploadGrant,
     ViewFileBoxWorkOrder,
 )
 from uos.core.tokens import sign_work_order_token
@@ -86,7 +88,7 @@ class AccessClient(AccessClientPort):
         """Grant upload access to a user for a box.
 
         Raises:
-            AccessAPIError if there's a problem during the operation.
+            AccessAPIError: if there's a problem during the operation.
         """
         url = (
             f"{self._access_url}/upload-access/users"
@@ -101,6 +103,8 @@ class AccessClient(AccessClientPort):
         if response.status_code != 200:
             log.error(
                 "Failed to grant upload access for user %s to box %s.",
+                user_id,
+                box_id,
                 extra={
                     "user_id": user_id,
                     "iva_id": iva_id,
@@ -113,11 +117,79 @@ class AccessClient(AccessClientPort):
             )
             raise self.AccessAPIError("Failed to grant upload access.")
 
+    async def revoke_upload_access(self, *, grant_id: UUID4) -> None:
+        """Revoke a user's access to an upload box.
+
+        Raises:
+            GrantNotFoundError: if the grant wasn't found.
+            AccessAPIError: if there's a problem during the operation.
+        """
+        url = f"{self._access_url}/upload-access/grants/{grant_id}"
+        response = httpx.delete(url)
+        if response.status_code == 204:
+            return
+
+        if response.status_code == 404:
+            raise self.GrantNotFoundError()
+        elif response.status_code != 204:
+            log.error(
+                "Failed to revoke upload access for grant ID %s.",
+                grant_id,
+                extra={
+                    "grant_id": grant_id,
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                },
+            )
+            raise self.AccessAPIError("Failed to grant upload access.")
+
+    async def get_upload_access_grants(
+        self,
+        *,
+        user_id: UUID4 | None = None,
+        iva_id: UUID4 | None = None,
+        box_id: UUID4 | None = None,
+        valid: bool | None = None,
+    ) -> list[UploadGrant]:
+        """Get a list of upload grants.
+
+        Raises:
+            AccessAPIError: if there's a problem during the operation.
+        """
+        params: dict[str, Any] = {
+            "user_id": str(user_id) if user_id is not None else user_id,
+            "iva_id": str(iva_id) if iva_id is not None else iva_id,
+            "box_id": str(box_id) if box_id is not None else box_id,
+            "valid": valid,
+        }
+
+        url = f"{self._access_url}/upload-access/grants"
+        response = httpx.get(url, params=params)
+        if response.status_code != 200:
+            msg = "Failed to retrieve upload access grants."
+            log.error(
+                msg,
+                extra={
+                    **params,
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                },
+            )
+            raise self.AccessAPIError(msg)
+
+        try:
+            grants = [UploadGrant.model_validate(**grant) for grant in response.json()]
+            return grants
+        except Exception as err:
+            msg = "Failed to extract grant information from response."
+            log.error(msg, exc_info=True, extra=params)
+            raise self.AccessAPIError(msg) from err
+
     async def get_accessible_upload_boxes(self, user_id: UUID4) -> list[UUID4]:
         """Get list of upload box IDs accessible to a user.
 
         Raises:
-            AccessAPIError if there's a problem during the operation.
+            AccessAPIError: if there's a problem during the operation.
         """
         url = f"{self._access_url}/upload-access/users/{user_id}/boxes"
         response = httpx.get(url)
@@ -126,6 +198,10 @@ class AccessClient(AccessClientPort):
                 "Failed to retrieve list of research data upload boxes accessible to"
                 + " user %s from the access API.",
                 user_id,
+                extra={"status_code": response.status_code},
+            )
+            raise self.AccessAPIError(
+                f"Failed to retrieve list of boxes for user {user_id}"
             )
 
         try:
@@ -140,7 +216,7 @@ class AccessClient(AccessClientPort):
         """Check if a user has access to a specific upload box.
 
         Raises:
-            AccessAPIError if there's a problem during the operation.
+            AccessAPIError: if there's a problem during the operation.
         """
         url = f"{self._access_url}/upload-access/users/{user_id}/boxes/{box_id}"
 
