@@ -20,13 +20,13 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from ghga_service_commons.utils.crypt import encrypt
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from jwcrypto import jwk
 from pydantic import UUID4, Field, SecretStr
 from pydantic_settings import BaseSettings
 
 from uos.core.models import (
+    BaseWorkOrderToken,
     ChangeFileBoxWorkOrder,
     CreateFileBoxWorkOrder,
     UploadGrant,
@@ -63,10 +63,6 @@ class UCSApiConfig(BaseSettings):
         ...,
         description="The private key for signing work order tokens",
         examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
-    )
-    ucs_public_key: str = Field(
-        ...,
-        description="The public key used to encrypt work order tokens sent to the UCS",
     )
 
 
@@ -261,7 +257,6 @@ class UCSClient(UCSClientPort):
 
     def __init__(self, *, config: UCSApiConfig):
         self._ucs_url = config.ucs_url
-        self._ucs_public_key = config.ucs_public_key
         self._signing_key = jwk.JWK.from_json(
             config.work_order_signing_key.get_secret_value()
         )
@@ -270,9 +265,9 @@ class UCSClient(UCSClientPort):
             log.error(key_error)
             raise key_error
 
-    def _auth_header(self, signed_wot: str) -> dict[str, str]:
-        encrypted_wot = encrypt(signed_wot, self._ucs_public_key)
-        headers = {"Authorization": f"Bearer {encrypted_wot}"}
+    def _auth_header(self, wot: BaseWorkOrderToken) -> dict[str, str]:
+        signed_wot = sign_work_order_token(wot, self._signing_key)
+        headers = {"Authorization": f"Bearer {signed_wot}"}
         return headers
 
     async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
@@ -281,8 +276,7 @@ class UCSClient(UCSClientPort):
         Raises:
             UCSCallError if there's a problem with the operation.
         """
-        signed_wot = sign_work_order_token(CreateFileBoxWorkOrder(), self._signing_key)
-        headers = self._auth_header(signed_wot)
+        headers = self._auth_header(CreateFileBoxWorkOrder())
         body = {"storage_alias": storage_alias}
         response = httpx.post(f"{self._ucs_url}/boxes", headers=headers, json=body)
         if response.status_code != 201:
@@ -310,8 +304,7 @@ class UCSClient(UCSClientPort):
             UCSCallError if there's a problem with the operation.
         """
         wot = ChangeFileBoxWorkOrder(work_type="lock", box_id=box_id)
-        signed_wot = sign_work_order_token(wot, self._signing_key)
-        headers = self._auth_header(signed_wot)
+        headers = self._auth_header(wot)
         body = {"lock": True}
         response = httpx.patch(
             f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
@@ -334,8 +327,8 @@ class UCSClient(UCSClientPort):
             UCSCallError if there's a problem with the operation.
         """
         wot = ChangeFileBoxWorkOrder(work_type="unlock", box_id=box_id)
-        signed_wot = sign_work_order_token(wot, self._signing_key)
-        headers = self._auth_header(signed_wot)
+
+        headers = self._auth_header(wot)
         body = {"lock": False}
         response = httpx.patch(
             f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
@@ -358,8 +351,7 @@ class UCSClient(UCSClientPort):
             UCSCallError if there's a problem with the operation.
         """
         wot = ViewFileBoxWorkOrder(box_id=box_id)
-        signed_wot = sign_work_order_token(wot, self._signing_key)
-        headers = self._auth_header(signed_wot)
+        headers = self._auth_header(wot)
         response = httpx.get(f"{self._ucs_url}/boxes/{box_id}/uploads", headers=headers)
         if response.status_code != 200:
             log.error(

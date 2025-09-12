@@ -175,7 +175,7 @@ async def test_get_upload_box_files_happy(rig: JointRig):
     )
 
     # Mock the UCS client to return a list of file IDs
-    test_file_ids = [uuid4(), uuid4(), uuid4()]
+    test_file_ids = sorted([uuid4(), uuid4(), uuid4()])
     rig.ucs_client.get_file_upload_list.return_value = test_file_ids  # type: ignore
 
     # Mock the access client for non-data steward case

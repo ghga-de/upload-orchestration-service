@@ -45,11 +45,6 @@
       "type": "string",
       "writeOnly": true
     },
-    "ucs_public_key": {
-      "description": "The public key used to encrypt work order tokens sent to the UCS",
-      "title": "Ucs Public Key",
-      "type": "string"
-    },
     "access_url": {
       "description": "URL pointing to the internal access API.",
       "examples": [
@@ -492,7 +487,6 @@
     "audit_record_type",
     "ucs_url",
     "work_order_signing_key",
-    "ucs_public_key",
     "access_url",
     "service_instance_id",
     "kafka_servers",

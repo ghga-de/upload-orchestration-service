@@ -104,8 +104,6 @@ The service requires the following configuration parameters:
   ```
 
 
-- <a id="properties/ucs_public_key"></a>**`ucs_public_key`** *(string, required)*: The public key used to encrypt work order tokens sent to the UCS.
-
 - <a id="properties/access_url"></a>**`access_url`** *(string, required)*: URL pointing to the internal access API.
 
 
