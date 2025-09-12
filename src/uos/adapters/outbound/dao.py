@@ -14,27 +14,50 @@
 # limitations under the License.
 """DAO implementation"""
 
-from hexkit.protocols.dao import DaoFactoryProtocol
+from hexkit.protocols.daopub import DaoPublisherFactoryProtocol
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 from uos.constants import BOX_COLLECTION
 from uos.core.models import ResearchDataUploadBox
 from uos.ports.outbound.dao import BoxDao
 
-__all__ = ["get_box_dao"]
+__all__ = ["OutboxPubConfig", "get_box_dao"]
+
+
+# TODO: Replace this config with the centrally defined one when ready
+class ResearchDataUploadBoxEventsConfig(BaseSettings):
+    """Config for events communicating changes in ResearchDataUploadBoxes.
+    The event types are hardcoded by `hexkit`.
+    """
+
+    research_data_upload_box_topic: str = Field(
+        ...,
+        description="Name of the event topic containing research data upload box events",
+        examples=["research-data-upload-boxes"],
+    )
+
+
+class OutboxPubConfig(ResearchDataUploadBoxEventsConfig):
+    """Config needed to publish outbox events"""
+
+
+def _dto_to_event(dto: ResearchDataUploadBox):
+    return dto.model_dump(mode="json")
 
 
 async def get_box_dao(
-    *, dao_factory: DaoFactoryProtocol | None = None, override: BoxDao | None = None
+    *, config: OutboxPubConfig, dao_publisher_factory: DaoPublisherFactoryProtocol
 ) -> BoxDao:
     """Construct a ResearchDataUploadBox DAO from the provided dao_factory"""
-    if override:
-        return override
-
-    if not dao_factory:
+    if not dao_publisher_factory:
         raise RuntimeError("No DAO Factory and no override provided for BoxDao")
 
-    return await dao_factory.get_dao(
+    return await dao_publisher_factory.get_dao(
         name=BOX_COLLECTION,
         dto_model=ResearchDataUploadBox,
         id_field="id",
+        autopublish=True,
+        dto_to_event=_dto_to_event,
+        event_topic=config.research_data_upload_box_topic,
     )

@@ -26,7 +26,10 @@ from hexkit.providers.akafka.provider import (
     KafkaEventSubscriber,
 )
 from hexkit.providers.mongodb import MongoDbDaoFactory
-from hexkit.providers.mongokafka import PersistentKafkaPublisher
+from hexkit.providers.mongokafka import (
+    MongoKafkaDaoPublisherFactory,
+    PersistentKafkaPublisher,
+)
 
 from uos.adapters.inbound.event_sub import OutboxSubTranslator
 from uos.adapters.inbound.fastapi_ import dummies
@@ -39,9 +42,6 @@ from uos.config import Config
 from uos.constants import SERVICE_NAME
 from uos.core.orchestrator import UploadOrchestrator
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
-from uos.ports.outbound.audit import AuditRepositoryPort
-from uos.ports.outbound.dao import BoxDao
-from uos.ports.outbound.http import AccessClientPort, UCSClientPort
 
 __all__ = [
     "prepare_core",
@@ -72,18 +72,14 @@ async def get_persistent_publisher(
 
 @asynccontextmanager
 async def prepare_core(
-    *,
-    config: Config,
-    box_dao_override: BoxDao | None = None,
-    audit_repo_override: AuditRepositoryPort | None = None,
-    ucs_client_override: UCSClientPort | None = None,
-    claims_client_override: AccessClientPort | None = None,
+    *, config: Config
 ) -> AsyncGenerator[UploadOrchestratorPort, None]:
     """Constructs and initializes all core components and their outbound dependencies.
 
     The _override parameters can be used to override the default dependencies.
     """
     async with (
+        MongoKafkaDaoPublisherFactory.construct(config=config) as dao_publisher_factory,
         MongoDbDaoFactory.construct(config=config) as dao_factory,
         get_persistent_publisher(
             config=config, dao_factory=dao_factory
@@ -92,12 +88,14 @@ async def prepare_core(
         event_publisher = EventPubTranslator(
             config=config, provider=persistent_pub_provider
         )
-        audit_repository = audit_repo_override or AuditRepository(
+        audit_repository = AuditRepository(
             service=SERVICE_NAME, event_publisher=event_publisher
         )
-        box_dao = await get_box_dao(dao_factory=dao_factory, override=box_dao_override)
-        claims_client = claims_client_override or AccessClient(config=config)
-        ucs_client = ucs_client_override or UCSClient(config=config)
+        box_dao = await get_box_dao(
+            config=config, dao_publisher_factory=dao_publisher_factory
+        )
+        claims_client = AccessClient(config=config)
+        ucs_client = UCSClient(config=config)
 
         yield UploadOrchestrator(
             box_dao=box_dao,

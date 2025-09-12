@@ -53,6 +53,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     iva_id = uuid4()
     file_upload_box_id = uuid4()
     audit_topic = joint_fixture.config.audit_record_topic
+    research_box_topic = joint_fixture.config.research_data_upload_box_topic
 
     # Create auth contexts
     iat = now_utc_ms_prec() - timedelta(hours=1)
@@ -81,9 +82,12 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         status_code=201,
         json=str(file_upload_box_id),
     )
-    async with joint_fixture.kafka.record_events(
-        in_topic=audit_topic
-    ) as event_recorder:
+    async with (
+        joint_fixture.kafka.record_events(in_topic=audit_topic) as audit_event_recorder,
+        joint_fixture.kafka.record_events(
+            in_topic=research_box_topic
+        ) as box_event_recorder,
+    ):
         box_id = (
             await joint_fixture.upload_orchestrator.create_research_data_upload_box(
                 title="Test Box",
@@ -92,10 +96,13 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
                 user_id=ds_user_id,
             )
         )
-    assert event_recorder.recorded_events
-    audit_event = event_recorder.recorded_events[0]
+    assert audit_event_recorder.recorded_events
+    audit_event = audit_event_recorder.recorded_events[0]
     assert audit_event.payload["label"] == "ResearchDataUploadBox created"  # suffices
     assert box_id is not None
+    assert box_event_recorder.recorded_events
+    assert len(box_event_recorder.recorded_events) == 1
+    assert box_event_recorder.recorded_events[0].payload["id"] == str(box_id)
 
     # 2. Granting a user access to said box
     httpx_mock.add_response(
@@ -125,17 +132,23 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         url=f"{access_url}/upload-access/users/{ds_user_id}/boxes/{box_id}",
         status_code=200,
     )
-    async with joint_fixture.kafka.record_events(
-        in_topic=audit_topic
-    ) as event_recorder:
+    async with (
+        joint_fixture.kafka.record_events(in_topic=audit_topic) as audit_event_recorder,
+        joint_fixture.kafka.record_events(
+            in_topic=research_box_topic
+        ) as box_event_recorder,
+    ):
         await joint_fixture.upload_orchestrator.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
             auth_context=ds_auth_context,
         )
-    assert event_recorder.recorded_events
-    audit_event = event_recorder.recorded_events[0]
+    assert audit_event_recorder.recorded_events
+    audit_event = audit_event_recorder.recorded_events[0]
     assert audit_event.payload["label"] == "ResearchDataUploadBox updated"
+    assert box_event_recorder.recorded_events
+    assert len(box_event_recorder.recorded_events) == 1
+    assert box_event_recorder.recorded_events[0].payload["title"] == "Updated Test Box"
 
     # 4. Receiving a FileUploadBox update event from kafka (which belongs to the box)
     file_upload_box_event: dict[str, Any] = {
@@ -153,8 +166,14 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         key=str(file_upload_box_id),
     )
 
-    # Process the event
-    await joint_fixture.event_subscriber.run(forever=False)
+    # Process the event and make sure an outbox event is published
+    async with joint_fixture.kafka.record_events(
+        in_topic=research_box_topic
+    ) as recorder:
+        await joint_fixture.event_subscriber.run(forever=False)
+    assert recorder.recorded_events
+    assert len(recorder.recorded_events) == 1
+    assert recorder.recorded_events[0].payload["file_count"] == 3  # check one property
 
     # 5. Querying the box (should show updated file count and size)
     httpx_mock.add_response(

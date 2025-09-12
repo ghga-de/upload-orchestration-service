@@ -28,7 +28,6 @@ from jwcrypto.jwk import JWK
 
 from tests.fixtures import ConfigFixture
 from tests.fixtures.config import get_config
-from uos.adapters.outbound.dao import BoxDao, get_box_dao
 from uos.config import Config
 from uos.inject import prepare_core, prepare_event_subscriber, prepare_rest_app
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
@@ -43,7 +42,6 @@ class JointFixture:
     event_subscriber: KafkaEventSubscriber
     kafka: KafkaFixture
     mongodb: MongoDbFixture
-    box_dao: BoxDao
     rest_client: AsyncTestClient
     jwk: JWK
 
@@ -81,7 +79,6 @@ async def joint_fixture(
             event_subscriber=event_subscriber,
             kafka=kafka,
             mongodb=mongodb,
-            box_dao=await get_box_dao(dao_factory=mongodb.dao_factory),
             rest_client=rest_client,
             jwk=config.jwk,
         )
