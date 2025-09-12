@@ -45,6 +45,7 @@ mongo_timeout: 300
 openapi_url: /openapi.json
 otel_trace_sampling_rate: 1.0
 port: 8080
+research_data_upload_box_topic: research-data-upload-boxes
 service_instance_id: '1'
 service_name: uos
 ucs_url: http://127.0.0.1/upload

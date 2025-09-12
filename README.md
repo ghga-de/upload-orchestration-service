@@ -49,6 +49,16 @@ uos --help
 ### Parameters
 
 The service requires the following configuration parameters:
+- <a id="properties/research_data_upload_box_topic"></a>**`research_data_upload_box_topic`** *(string, required)*: Name of the event topic containing research data upload box events.
+
+
+  Examples:
+
+  ```json
+  "research-data-upload-boxes"
+  ```
+
+
 - <a id="properties/file_upload_box_topic"></a>**`file_upload_box_topic`** *(string, required)*: Topic containing published FileUploadBox outbox events.
 
 
