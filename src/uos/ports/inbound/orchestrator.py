@@ -22,10 +22,12 @@ from ghga_service_commons.auth.ghga import AuthContext
 from pydantic import UUID4
 
 from uos.core.models import (
+    BoxRetrievalResults,
     ClaimValidity,
     FileUploadBox,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
+    SortOrder,
     UpdateUploadBoxRequest,
 )
 
@@ -170,5 +172,25 @@ class UploadOrchestratorPort(ABC):
         Raises:
             BoxAccessError: If the user doesn't have access to the box
             BoxNotFoundError: If the box doesn't exist
+        """
+        ...
+
+    @abstractmethod
+    async def get_research_data_upload_boxes(
+        self,
+        *,
+        auth_context: AuthContext,
+        skip: int | None = None,
+        limit: int | None = None,
+        sort: SortOrder = SortOrder.ASCENDING,
+    ) -> BoxRetrievalResults:
+        """Retrieve all Research Data Upload Boxes, optionally paginated.
+
+        For data stewards, returns all boxes. For regular users, only returns boxes
+        they have access to according to the Access API.
+
+        Results are sorted alphabetically by title, ascending by default.
+
+        Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """
         ...

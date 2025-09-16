@@ -35,6 +35,15 @@ pytestmark = pytest.mark.asyncio()
 TEST_UCS_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
 
+# Auth context constants for testing
+DATA_STEWARD_AUTH_CONTEXT = Mock()
+DATA_STEWARD_AUTH_CONTEXT.id = str(TEST_DS_ID)
+DATA_STEWARD_AUTH_CONTEXT.roles = ["data_steward"]
+
+REGULAR_USER_AUTH_CONTEXT = Mock()
+REGULAR_USER_AUTH_CONTEXT.id = str(TEST_DS_ID)
+REGULAR_USER_AUTH_CONTEXT.roles = []
+
 
 @dataclass
 class JointRig:
@@ -107,13 +116,6 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
     # Mock the access client to return that the user has access
     rig.access_client.check_box_access.return_value = True  # type: ignore
 
-    # Create a mock auth context for a data steward
-    from unittest.mock import Mock
-
-    auth_context = Mock()
-    auth_context.id = str(TEST_DS_ID)
-    auth_context.roles = ["data_steward"]
-
     # Create an update request
     from uos.core.models import UpdateUploadBoxRequest
 
@@ -123,7 +125,7 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
 
     # Call the update method
     await rig.controller.update_research_data_upload_box(
-        box_id=box_id, request=update_request, auth_context=auth_context
+        box_id=box_id, request=update_request, auth_context=DATA_STEWARD_AUTH_CONTEXT
     )
 
     # Verify the box was updated
@@ -142,11 +144,6 @@ async def test_update_research_data_upload_box_not_found(rig: JointRig):
     # Mock the access client to return that the user has access (but box doesn't exist)
     rig.access_client.check_box_access.return_value = True  # type: ignore
 
-    # Create a mock auth context for a data steward
-    auth_context = Mock()
-    auth_context.id = str(TEST_DS_ID)
-    auth_context.roles = ["data_steward"]
-
     # Create an update request
     update_request = models.UpdateUploadBoxRequest(
         title="Updated Title", description="Updated Description"
@@ -160,7 +157,7 @@ async def test_update_research_data_upload_box_not_found(rig: JointRig):
         await rig.controller.update_research_data_upload_box(
             box_id=non_existent_box_id,
             request=update_request,
-            auth_context=auth_context,
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
 
@@ -181,14 +178,9 @@ async def test_get_upload_box_files_happy(rig: JointRig):
     # Mock the access client for non-data steward case
     rig.access_client.get_accessible_upload_boxes.return_value = [box_id]  # type: ignore
 
-    # Create a mock auth context for a regular user (not data steward)
-    auth_context = Mock()
-    auth_context.id = str(TEST_DS_ID)
-    auth_context.roles = ["regular_user"]
-
     # Call the method
     result = await rig.controller.get_upload_box_files(
-        box_id=box_id, auth_context=auth_context
+        box_id=box_id, auth_context=REGULAR_USER_AUTH_CONTEXT
     )
 
     # Verify the results
@@ -214,16 +206,16 @@ async def test_get_upload_box_files_access_error(rig: JointRig):
     # Mock the access client to return that the user does NOT have access to this box
     rig.access_client.get_accessible_upload_boxes.return_value = []  # type: ignore
 
-    # Create a mock auth context for a regular user (not data steward)
-    auth_context = Mock()
+    # Create a mock auth context for a different user (not data steward)
     different_user_id = uuid4()
-    auth_context.id = str(different_user_id)
-    auth_context.roles = ["regular_user"]
+    different_user_auth_context = Mock()
+    different_user_auth_context.id = str(different_user_id)
+    different_user_auth_context.roles = []
 
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_upload_box_files(
-            box_id=box_id, auth_context=auth_context
+            box_id=box_id, auth_context=different_user_auth_context
         )
 
     # Verify that access check was performed
@@ -235,11 +227,6 @@ async def test_get_upload_box_files_access_error(rig: JointRig):
 
 async def test_get_upload_box_files_box_not_found(rig: JointRig):
     """Test the case where getting box files fails because the box doesn't exist."""
-    # Create a mock auth context for a data steward (to bypass access checks)
-    auth_context = Mock()
-    auth_context.id = str(TEST_DS_ID)
-    auth_context.roles = ["data_steward"]
-
     # Try to get files from a non-existent box ID
     non_existent_box_id = uuid4()
 
@@ -247,7 +234,7 @@ async def test_get_upload_box_files_box_not_found(rig: JointRig):
     # The error comes from the initial get_by_id call in get_upload_box_files
     with pytest.raises(rig.controller.BoxNotFoundError):
         await rig.controller.get_upload_box_files(
-            box_id=non_existent_box_id, auth_context=auth_context
+            box_id=non_existent_box_id, auth_context=DATA_STEWARD_AUTH_CONTEXT
         )
 
     # Verify that access client was NOT called since the box lookup failed first
@@ -520,3 +507,92 @@ async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
 
     # Verify access client was called
     rig.access_client.get_upload_access_grants.assert_called_once()  # type: ignore
+
+
+async def test_get_boxes(rig: JointRig):
+    """Test the get_research_data_upload_boxes method in the orchestrator."""
+    # Create multiple boxes for testing
+    box_ids = []
+    for i in range(5):
+        box_id = await rig.controller.create_research_data_upload_box(
+            title=f"Box {chr(65 + i)}",  # "Box A", "Box B", etc.
+            description=f"Description {i}",
+            storage_alias="HD01",
+            user_id=TEST_DS_ID,
+        )
+        box_ids.append(box_id)
+
+    # Test 1: Data steward can see all boxes
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT
+    )
+    assert results.count == 5
+    assert len(results.boxes) == 5
+
+    # Verify sorting by title (alphabetical, ascending by default)
+    assert results.boxes[0].title == "Box A"
+    assert results.boxes[4].title == "Box E"
+
+    # Check non-default sort order param
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, sort=models.SortOrder.DESCENDING
+    )
+    assert results.count == 5
+    assert len(results.boxes) == 5
+    assert results.boxes[0].title == "Box E"
+    assert results.boxes[4].title == "Box A"
+
+    # Verify pagination works for data stewards
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, skip=2, limit=2
+    )
+    assert results.count == 5  # Total count is still 5
+    assert len(results.boxes) == 2  # But we only get 2 items
+    assert results.boxes[0].title == "Box C"
+    assert results.boxes[1].title == "Box D"
+
+    # Verify that non-data stewards see only accessible boxes
+    regular_user_id = uuid4()
+    regular_user_auth_context = Mock()
+    regular_user_auth_context.id = str(regular_user_id)
+    regular_user_auth_context.roles = ["regular_user"]
+
+    # Mock access client to return only some boxes as accessible
+    accessible_boxes = [box_ids[1], box_ids[3]]  # Box B and Box D
+    rig.access_client.get_accessible_upload_boxes.return_value = accessible_boxes  # type: ignore
+
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=regular_user_auth_context
+    )
+    assert results.count == 2
+    assert len(results.boxes) == 2
+    assert results.boxes[0].title == "Box B"
+    assert results.boxes[1].title == "Box D"
+
+    # Verify the access client was called with the correct user ID
+    rig.access_client.get_accessible_upload_boxes.assert_called_once_with(  # type: ignore
+        user_id=regular_user_id
+    )
+
+    # Test 5: Regular user with no accessible boxes
+    rig.access_client.get_accessible_upload_boxes.reset_mock()  # type: ignore
+    rig.access_client.get_accessible_upload_boxes.return_value = []  # type: ignore
+
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=regular_user_auth_context
+    )
+    assert results.count == 0
+    assert len(results.boxes) == 0
+
+    # Verify pagination works for non-data stewards
+    rig.access_client.get_accessible_upload_boxes.reset_mock()  # type: ignore
+    # User has access to 3 boxes
+    accessible_boxes = [box_ids[0], box_ids[2], box_ids[4]]  # Box A, Box C, Box E
+    rig.access_client.get_accessible_upload_boxes.return_value = accessible_boxes  # type: ignore
+
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=regular_user_auth_context, skip=1, limit=1
+    )
+    assert results.count == 3  # User can access 3 boxes total
+    assert len(results.boxes) == 1  # But we only get 1 item due to pagination
+    assert results.boxes[0].title == "Box C"

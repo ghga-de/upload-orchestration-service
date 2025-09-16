@@ -25,11 +25,13 @@ from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
 from uos.core.models import (
+    BoxRetrievalResults,
     ClaimValidity,
     FileUploadBox,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     ResearchDataUploadBoxState,
+    SortOrder,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
@@ -343,3 +345,48 @@ class UploadOrchestrator(UploadOrchestratorPort):
             return await self._box_dao.get_by_id(box_id)
         except ResourceNotFoundError as err:
             raise self.BoxNotFoundError(box_id=box_id) from err
+
+    async def get_research_data_upload_boxes(
+        self,
+        *,
+        auth_context: AuthContext,
+        skip: int | None = None,
+        limit: int | None = None,
+        sort: SortOrder = SortOrder.ASCENDING,
+    ) -> BoxRetrievalResults:
+        """Retrieve all Research Data Upload Boxes, optionally paginated.
+
+        For data stewards, returns all boxes. For regular users, only returns boxes
+        they have access to according to the Access API.
+
+        Results are sorted alphabetically by title, ascending by default.
+
+        Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
+        """
+        # Check if user is a data steward
+        is_data_steward = "data_steward" in (auth_context.roles or [])
+
+        if is_data_steward:
+            # Data stewards can see all boxes
+            boxes = [x async for x in self._box_dao.find_all(mapping={})]
+        else:
+            # Regular users can only see boxes they have access to
+            user_id = UUID(auth_context.id)
+            accessible_box_ids = await self._access_client.get_accessible_upload_boxes(
+                user_id=user_id
+            )
+
+            # Get all boxes and filter to only accessible ones
+            all_boxes = [x async for x in self._box_dao.find_all(mapping={})]
+            boxes = [box for box in all_boxes if box.id in accessible_box_ids]
+
+        count = len(boxes)
+        boxes.sort(key=lambda x: x.title, reverse=sort == SortOrder.DESCENDING)
+
+        if skip:
+            boxes = boxes[skip:]
+
+        if limit:
+            boxes = boxes[:limit]
+
+        return BoxRetrievalResults(count=count, boxes=boxes)

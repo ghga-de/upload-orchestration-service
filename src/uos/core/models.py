@@ -15,7 +15,7 @@
 
 """Data models for the Upload Orchestration Service."""
 
-from enum import StrEnum
+from enum import Enum, StrEnum
 from typing import Literal
 
 from ghga_service_commons.utils.utc_dates import UTCDatetime
@@ -240,3 +240,19 @@ class GrantWithBoxInfo(UploadGrant):
 
     title: str = Field(..., description="Short meaningful name for the box")
     description: str = Field(..., description="Describes the upload box in more detail")
+
+
+class SortOrder(Enum):
+    """Represents the possible sorting orders"""
+
+    ASCENDING = "ascending"
+    DESCENDING = "descending"
+
+
+class BoxRetrievalResults(BaseModel):
+    """A model encapsulating retrieved research data upload boxes and the count thereof."""
+
+    count: int = Field(..., description="The total number of unpaginated results")
+    boxes: list[ResearchDataUploadBox] = Field(
+        ..., description="The retrieved research data upload boxes"
+    )

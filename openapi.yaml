@@ -1,5 +1,24 @@
 components:
   schemas:
+    BoxRetrievalResults:
+      description: A model encapsulating retrieved research data upload boxes and
+        the count thereof.
+      properties:
+        boxes:
+          description: The retrieved research data upload boxes
+          items:
+            $ref: '#/components/schemas/ResearchDataUploadBox'
+          title: Boxes
+          type: array
+        count:
+          description: The total number of unpaginated results
+          title: Count
+          type: integer
+      required:
+      - count
+      - boxes
+      title: BoxRetrievalResults
+      type: object
     ClaimValidity:
       description: Start and end dates for validating claims.
       properties:
@@ -232,6 +251,13 @@ components:
       - closed
       title: ResearchDataUploadBoxState
       type: string
+    SortOrder:
+      description: Represents the possible sorting orders
+      enum:
+      - ascending
+      - descending
+      title: SortOrder
+      type: string
     UpdateUploadBoxRequest:
       description: Request model for updating a research data upload box.
       properties:
@@ -411,6 +437,59 @@ paths:
       - HTTPBearer: []
       summary: Revoke an upload access grant
   /boxes:
+    get:
+      description: Returns a list of research data upload boxes. Results are sorted
+        alphabetically by title.
+      operationId: get_research_data_upload_boxes_boxes_get
+      parameters:
+      - description: Number of research data upload boxes to skip for pagination
+        in: query
+        name: skip
+        required: false
+        schema:
+          anyOf:
+          - minimum: 0
+            type: integer
+          - type: 'null'
+          description: Number of research data upload boxes to skip for pagination
+          title: Skip
+      - description: Maximum number of research data upload boxes to return
+        in: query
+        name: limit
+        required: false
+        schema:
+          anyOf:
+          - minimum: 0
+            type: integer
+          - type: 'null'
+          description: Maximum number of research data upload boxes to return
+          title: Limit
+      - description: Sort order(s) that shall be used when sorting results
+        in: query
+        name: sort
+        required: false
+        schema:
+          $ref: '#/components/schemas/SortOrder'
+          default: ascending
+          description: Sort order(s) that shall be used when sorting results
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoxRetrievalResults'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      security:
+      - HTTPBearer: []
+      summary: List upload boxes
+      tags:
+      - UploadOrchestrationService
     post:
       description: Create a new research data upload box to label and track related
         file uploads for a given user.

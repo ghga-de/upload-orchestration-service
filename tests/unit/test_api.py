@@ -24,7 +24,7 @@ from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
-from uos.core.models import GrantWithBoxInfo, ResearchDataUploadBox
+from uos.core.models import BoxRetrievalResults, GrantWithBoxInfo, ResearchDataUploadBox
 from uos.inject import prepare_rest_app
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.http import UCSClientPort
@@ -505,3 +505,100 @@ async def test_get_upload_access_grants(
         orchestrator.get_upload_access_grants.side_effect = TypeError()
         response = await rest_client.get(url, headers=ds_auth_headers)
         assert response.status_code == 500
+
+
+async def test_get_boxes(
+    config: ConfigFixture,
+    ds_auth_headers: dict[str, str],
+    user_auth_headers: dict[str, str],
+):
+    """Test GET /boxes endpoint."""
+    orchestrator = AsyncMock(spec=UploadOrchestratorPort)
+
+    # Create test boxes
+    test_boxes = [
+        ResearchDataUploadBox(
+            id=uuid4(),
+            state="open",  # type: ignore
+            title="Box A",
+            description="Description A",
+            last_changed=now_utc_ms_prec(),
+            changed_by=TEST_DS_ID,
+            file_upload_box_id=uuid4(),
+            storage_alias="HD01",
+        ),
+        ResearchDataUploadBox(
+            id=uuid4(),
+            state="open",  # type: ignore
+            title="Box B",
+            description="Description B",
+            last_changed=now_utc_ms_prec(),
+            changed_by=TEST_DS_ID,
+            file_upload_box_id=uuid4(),
+            storage_alias="HD01",
+        ),
+    ]
+
+    async with (
+        prepare_rest_app(
+            config=config.config, upload_orchestrator_override=orchestrator
+        ) as app,
+        AsyncTestClient(app=app) as rest_client,
+    ):
+        url = "/boxes"
+
+        # Test successful data steward request
+        orchestrator.get_research_data_upload_boxes.return_value = BoxRetrievalResults(
+            count=2, boxes=test_boxes
+        )
+        response = await rest_client.get(url, headers=ds_auth_headers)
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["count"] == 2
+        assert len(response_data["boxes"]) == 2
+        assert response_data["boxes"][0]["title"] == "Box A"
+        assert response_data["boxes"][1]["title"] == "Box B"
+
+        # Test with non-data steward (regular user)
+        orchestrator.reset_mock()
+        orchestrator.get_research_data_upload_boxes.return_value = BoxRetrievalResults(
+            count=1, boxes=[test_boxes[0]]
+        )
+        response = await rest_client.get(url, headers=user_auth_headers)
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["count"] == 1
+        assert len(response_data["boxes"]) == 1
+
+        # Test other exception
+        orchestrator.reset_mock()
+        orchestrator.get_research_data_upload_boxes.side_effect = ValueError(
+            "Test error"
+        )
+        response = await rest_client.get(url, headers=ds_auth_headers)
+        assert response.status_code == 500
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"skip": -1},
+        {"skip": "abc"},
+        {"limit": -1},
+        {"limit": "abc"},
+        {"skip": 10, "limit": 5},
+        {"sort": "bad"},
+    ],
+)
+async def test_get_boxes_bad_parameters(config: ConfigFixture, ds_auth_headers, params):
+    """Test the GET /boxes endpoint with bad parameters but valid auth context"""
+    orchestrator = AsyncMock(spec=UploadOrchestratorPort)
+    async with (
+        prepare_rest_app(
+            config=config.config, upload_orchestrator_override=orchestrator
+        ) as app,
+        AsyncTestClient(app=app) as rest_client,
+    ):
+        url = "/boxes"
+        response = await rest_client.get(url, headers=ds_auth_headers, params=params)
+        assert response.status_code == 422

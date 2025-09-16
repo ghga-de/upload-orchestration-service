@@ -21,7 +21,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query, status
-from pydantic import UUID4
+from pydantic import UUID4, NonNegativeInt
 
 from uos.adapters.inbound.fastapi_.auth import UserAuthContext
 from uos.adapters.inbound.fastapi_.dummies import UploadOrchestratorDummy
@@ -30,13 +30,16 @@ from uos.adapters.inbound.fastapi_.http_exceptions import (
     HttpGrantNotFoundError,
     HttpInternalError,
     HttpNotAuthorizedError,
+    HttpPaginationError,
 )
 from uos.constants import TRACER
 from uos.core.models import (
+    BoxRetrievalResults,
     CreateUploadBoxRequest,
     GrantAccessRequest,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
+    SortOrder,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
@@ -64,6 +67,56 @@ def check_data_steward_role(auth_context: UserAuthContext) -> bool:
 async def health():
     """Used to test if this service is alive"""
     return {"status": "OK"}
+
+
+@router.get(
+    "/boxes",
+    summary="List upload boxes",
+    description="Returns a list of research data upload boxes. Results are sorted alphabetically by title.",
+    tags=TAGS,
+    response_model=BoxRetrievalResults,
+)
+@TRACER.start_as_current_span("routes.get_research_data_upload_boxes")
+async def get_research_data_upload_boxes(
+    upload_service: UploadOrchestratorDummy,
+    auth_context: UserAuthContext,
+    skip: Annotated[
+        NonNegativeInt | None,
+        Query(
+            description="Number of research data upload boxes to skip for pagination",
+        ),
+    ] = None,
+    limit: Annotated[
+        NonNegativeInt | None,
+        Query(
+            description="Maximum number of research data upload boxes to return",
+        ),
+    ] = None,
+    sort: Annotated[
+        SortOrder,
+        Query(description="Sort order(s) that shall be used when sorting results"),
+    ] = SortOrder.ASCENDING,
+) -> BoxRetrievalResults:
+    """Get list of all research data upload boxes with pagination support."""
+    if skip and limit and (skip >= limit):
+        raise HttpPaginationError(
+            message="Skip must be less than limit",
+            skip=skip,
+            limit=limit,
+            sort=sort.value,
+        )
+
+    try:
+        results = await upload_service.get_research_data_upload_boxes(
+            auth_context=auth_context,
+            skip=skip,
+            limit=limit,
+            sort=sort,
+        )
+        return results
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to get upload boxes") from err
 
 
 @router.get(

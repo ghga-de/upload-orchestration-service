@@ -90,3 +90,32 @@ class HttpInternalError(HttpCustomExceptionBase):
             description=message,
             data={},
         )
+
+
+class HttpPaginationError(HttpCustomExceptionBase):
+    """Raise when there is a problem with the supplied pagination parameters"""
+
+    exception_id = "paginationError"
+
+    class DataModel(BaseModel):
+        """Model for exception data"""
+
+        skip: int | None
+        limit: int | None
+        sort: str
+
+    def __init__(
+        self,
+        *,
+        message: str = "There was a problem with the supplied pagination parameters.",
+        skip: int | None,
+        limit: int | None,
+        sort: str,
+        status_code: int = 422,
+    ):
+        """Construct message and init the exception."""
+        super().__init__(
+            status_code=status_code,
+            description=message,
+            data={"skip": skip, "limit": limit, "sort": sort},
+        )
