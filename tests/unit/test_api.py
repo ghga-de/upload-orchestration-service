@@ -121,13 +121,13 @@ async def test_get_research_data_upload_box(
         assert response.status_code == 200
         assert response.json() == box.model_dump(mode="json")
 
-        # handle box access error from core
+        # handle box access error from core -- we obscure this with 404 for security
         orchestrator.reset_mock()
         orchestrator.get_research_data_upload_box.side_effect = (
             UploadOrchestratorPort.BoxAccessError()
         )
         response = await rest_client.get(url, headers=user_auth_headers)
-        assert response.status_code == 403
+        assert response.status_code == 404
 
         # handle box not found error from core
         orchestrator.reset_mock()

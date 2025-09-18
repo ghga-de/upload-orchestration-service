@@ -120,7 +120,9 @@ async def get_research_data_upload_box(
     upload_service: UploadOrchestratorDummy,
     auth_context: UserAuthContext,
 ):
-    """Get details of a specific upload box."""
+    """Get details of a specific upload box. If the user doesn't have access to an
+    existing box, this endpoint will return a 404.
+    """
     try:
         user_id = UUID(auth_context.id)
         box = await upload_service.get_research_data_upload_box(
@@ -128,7 +130,7 @@ async def get_research_data_upload_box(
         )
         return box
     except UploadOrchestratorPort.BoxAccessError as err:
-        raise HttpNotAuthorizedError() from err
+        raise HttpBoxNotFoundError(box_id=box_id) from err
     except UploadOrchestratorPort.BoxNotFoundError as err:
         raise HttpBoxNotFoundError(box_id=box_id) from err
     except Exception as err:
