@@ -243,8 +243,10 @@ class UploadGrant(BaseModel):
 class GrantWithBoxInfo(UploadGrant):
     """An UploadGrant with the ResearchDataUploadBox title and description."""
 
-    title: str = Field(..., description="Short meaningful name for the box")
-    description: str = Field(..., description="Describes the upload box in more detail")
+    box_title: str = Field(..., description="Short meaningful name for the box")
+    box_description: str = Field(
+        ..., description="Describes the upload box in more detail"
+    )
 
 
 class BoxRetrievalResults(BaseModel):

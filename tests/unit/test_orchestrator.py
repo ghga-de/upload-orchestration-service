@@ -427,8 +427,8 @@ async def test_get_upload_access_grants_happy(rig: JointRig):
     assert grant_with_info.user_email == "test@example.com"
     assert grant_with_info.user_title == "Dr."
     # These should come from the box
-    assert grant_with_info.title == "Test Box"
-    assert grant_with_info.description == "Test Description"
+    assert grant_with_info.box_title == "Test Box"
+    assert grant_with_info.box_description == "Test Description"
 
     # Verify access client was called with correct parameters
     rig.access_client.get_upload_access_grants.assert_called_once_with(  # type: ignore
@@ -493,8 +493,8 @@ async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
     assert len(result) == 1
     grant_with_info = result[0]
     assert grant_with_info.box_id == valid_box_id
-    assert grant_with_info.title == "Valid Box"
-    assert grant_with_info.description == "Valid Description"
+    assert grant_with_info.box_title == "Valid Box"
+    assert grant_with_info.box_description == "Valid Description"
 
     # Verify a warning was logged for the invalid box
     assert caplog.records

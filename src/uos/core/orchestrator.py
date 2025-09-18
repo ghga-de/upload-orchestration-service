@@ -230,7 +230,9 @@ class UploadOrchestrator(UploadOrchestratorPort):
             try:
                 box = await self._box_dao.get_by_id(grant.box_id)
                 grant_with_info = GrantWithBoxInfo(
-                    **grant.model_dump(), title=box.title, description=box.description
+                    **grant.model_dump(),
+                    box_title=box.title,
+                    box_description=box.description,
                 )
                 grants_with_info.append(grant_with_info)
             except ResourceNotFoundError:

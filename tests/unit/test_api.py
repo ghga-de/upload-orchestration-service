@@ -481,8 +481,8 @@ async def test_get_upload_access_grants(
                 user_name="Test User",
                 user_email="test@example.com",
                 user_title="Dr.",
-                title="Test Box",
-                description="Test box description",
+                box_title="Test Box",
+                box_description="Test box description",
             )
         ]
         orchestrator.get_upload_access_grants.return_value = test_grants
