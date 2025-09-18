@@ -359,6 +359,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         auth_context: AuthContext,
         skip: int | None = None,
         limit: int | None = None,
+        locked: bool | None = None,
     ) -> BoxRetrievalResults:
         """Retrieve all Research Data Upload Boxes, optionally paginated.
 
@@ -372,9 +373,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # Check if user is a data steward
         is_data_steward = "data_steward" in (auth_context.roles or [])
 
+        # Filter by locked status if specified
+        mapping = {"locked": locked} if locked is not None else {}
+
         if is_data_steward:
             # Data stewards can see all boxes
-            boxes = [x async for x in self._box_dao.find_all(mapping={})]
+            boxes = [x async for x in self._box_dao.find_all(mapping=mapping)]
         else:
             # Regular users can only see boxes they have access to
             user_id = UUID(auth_context.id)
@@ -383,7 +387,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
             )
 
             # Get all boxes and filter to only accessible ones
-            all_boxes = [x async for x in self._box_dao.find_all(mapping={})]
+            all_boxes = [x async for x in self._box_dao.find_all(mapping=mapping)]
             boxes = [box for box in all_boxes if box.id in accessible_box_ids]
 
         count = len(boxes)

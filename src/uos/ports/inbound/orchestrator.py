@@ -182,6 +182,7 @@ class UploadOrchestratorPort(ABC):
         auth_context: AuthContext,
         skip: int | None = None,
         limit: int | None = None,
+        locked: bool | None = None,
     ) -> BoxRetrievalResults:
         """Retrieve all Research Data Upload Boxes, optionally paginated.
 

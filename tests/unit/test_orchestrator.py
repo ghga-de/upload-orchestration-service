@@ -588,3 +588,41 @@ async def test_get_boxes(rig: JointRig):
     assert results.count == 3  # User can access 3 boxes total
     assert len(results.boxes) == 1  # But we only get 1 item due to pagination
     assert results.boxes[0].title == "Box C"
+
+    # Test locked filter functionality
+    # First, lock some boxes by updating their locked status
+    all_boxes = [x async for x in rig.box_dao.find_all(mapping={})]
+
+    # Lock the first two boxes (Box A and Box B)
+    locked_boxes = all_boxes[:2]
+    for box in locked_boxes:
+        updated_box = box.model_copy(update={"locked": True})
+        await rig.box_dao.update(updated_box)
+
+    # Test filtering for locked boxes only (as data steward)
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=True
+    )
+    assert results.count == 2
+    assert len(results.boxes) == 2
+    assert all(box.locked for box in results.boxes)
+    assert results.boxes[0].title == "Box A"
+    assert results.boxes[1].title == "Box B"
+
+    # Test filtering for unlocked boxes only (as data steward)
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=False
+    )
+    assert results.count == 3
+    assert len(results.boxes) == 3
+    assert all(not box.locked for box in results.boxes)
+    assert results.boxes[0].title == "Box C"
+    assert results.boxes[1].title == "Box D"
+    assert results.boxes[2].title == "Box E"
+
+    # Test no filter (None) returns all boxes (as data steward)
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=None
+    )
+    assert results.count == 5
+    assert len(results.boxes) == 5

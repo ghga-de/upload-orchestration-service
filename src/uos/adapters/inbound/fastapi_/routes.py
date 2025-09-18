@@ -86,6 +86,12 @@ async def get_research_data_upload_boxes(
             description="Maximum number of research data upload boxes to return",
         ),
     ] = None,
+    locked: Annotated[
+        bool | None,
+        Query(
+            description="Filter by locked status. None returns both locked and unlocked boxes.",
+        ),
+    ] = None,
 ) -> BoxRetrievalResults:
     """Get list of all research data upload boxes with pagination support."""
     if skip and limit and (skip >= limit):
@@ -100,6 +106,7 @@ async def get_research_data_upload_boxes(
             auth_context=auth_context,
             skip=skip,
             limit=limit,
+            locked=locked,
         )
         return results
     except Exception as err:

@@ -568,6 +568,37 @@ async def test_get_boxes(
         assert response_data["count"] == 1
         assert len(response_data["boxes"]) == 1
 
+        # Test locked parameter filtering
+        orchestrator.reset_mock()
+        locked_box = test_boxes[0].model_copy(update={"locked": True})
+        orchestrator.get_research_data_upload_boxes.return_value = BoxRetrievalResults(
+            count=1, boxes=[locked_box]
+        )
+        response = await rest_client.get(
+            url, headers=ds_auth_headers, params={"locked": "true"}
+        )
+        assert response.status_code == 200
+        response_data = response.json()
+        assert response_data["count"] == 1
+        assert len(response_data["boxes"]) == 1
+
+        # Verify orchestrator was called with locked=True
+        call_args = orchestrator.get_research_data_upload_boxes.call_args
+        assert call_args.kwargs["locked"] is True
+
+        # Test locked=false parameter
+        orchestrator.reset_mock()
+        unlocked_box = test_boxes[1].model_copy(update={"locked": False})
+        orchestrator.get_research_data_upload_boxes.return_value = BoxRetrievalResults(
+            count=1, boxes=[unlocked_box]
+        )
+        response = await rest_client.get(
+            url, headers=ds_auth_headers, params={"locked": "false"}
+        )
+        assert response.status_code == 200
+        call_args = orchestrator.get_research_data_upload_boxes.call_args
+        assert call_args.kwargs["locked"] is False
+
         # Test other exception
         orchestrator.reset_mock()
         orchestrator.get_research_data_upload_boxes.side_effect = ValueError(
