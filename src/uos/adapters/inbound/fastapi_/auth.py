@@ -15,16 +15,17 @@
 
 """Helper dependencies for requiring authentication and authorization."""
 
+from functools import partial
 from typing import Annotated
 
 from fastapi import Depends, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from ghga_service_commons.auth.ghga import AuthContext
+from ghga_service_commons.auth.ghga import AuthContext, has_role
 from ghga_service_commons.auth.policies import require_auth_context_using_credentials
 
 from uos.adapters.inbound.fastapi_ import dummies
 
-__all__ = ["UserAuthContext"]
+__all__ = ["StewardAuthContext", "UserAuthContext"]
 
 
 async def require_auth_context(
@@ -37,5 +38,21 @@ async def require_auth_context(
     return await require_auth_context_using_credentials(credentials, auth_provider)
 
 
+is_steward = partial(has_role, role="data_steward")
+
+
+async def require_steward_context(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials, Depends(HTTPBearer(auto_error=True))
+    ],
+    auth_provider: dummies.AuthProviderDummy,
+) -> AuthContext:
+    """Require a GHGA auth context with data steward role."""
+    return await require_auth_context_using_credentials(
+        credentials, auth_provider, is_steward
+    )
+
+
 # policy that requires (and returns) a user auth context
 UserAuthContext = Annotated[AuthContext, Security(require_auth_context)]
+StewardAuthContext = Annotated[AuthContext, Security(require_steward_context)]

@@ -94,19 +94,23 @@ components:
     GrantWithBoxInfo:
       description: An UploadGrant with the ResearchDataUploadBox title and description.
       properties:
+        box_description:
+          description: Describes the upload box in more detail
+          title: Box Description
+          type: string
         box_id:
           description: ID of the upload box this grant is for
           format: uuid4
           title: Box Id
           type: string
+        box_title:
+          description: Short meaningful name for the box
+          title: Box Title
+          type: string
         created:
           description: Date of creation of this grant
           format: date-time
           title: Created
-          type: string
-        description:
-          description: Describes the upload box in more detail
-          title: Description
           type: string
         id:
           description: Internal grant ID (same as claim ID)
@@ -120,10 +124,6 @@ components:
           - type: 'null'
           description: ID of an IVA associated with this grant
           title: Iva Id
-        title:
-          description: Short meaningful name for the box
-          title: Title
-          type: string
         user_email:
           description: The email address of the user
           format: email
@@ -163,8 +163,8 @@ components:
       - valid_until
       - user_name
       - user_email
-      - title
-      - description
+      - box_title
+      - box_description
       title: GrantWithBoxInfo
       type: object
     HTTPValidationError:

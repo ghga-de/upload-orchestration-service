@@ -23,7 +23,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, status
 from pydantic import UUID4, NonNegativeInt
 
-from uos.adapters.inbound.fastapi_.auth import UserAuthContext
+from uos.adapters.inbound.fastapi_.auth import StewardAuthContext, UserAuthContext
 from uos.adapters.inbound.fastapi_.dummies import UploadOrchestratorDummy
 from uos.adapters.inbound.fastapi_.http_exceptions import (
     HttpBoxNotFoundError,
@@ -49,11 +49,6 @@ router = APIRouter()
 
 TAGS: list[str | Enum] = ["UploadOrchestrationService"]
 # TODO: fill in possible response codes
-
-
-def check_data_steward_role(auth_context: UserAuthContext) -> bool:
-    """Check if the user has Data Steward role."""
-    return "data_steward" in auth_context.roles
 
 
 @router.get(
@@ -154,13 +149,9 @@ async def get_research_data_upload_box(
 async def create_research_data_upload_box(
     request: CreateUploadBoxRequest,
     upload_service: UploadOrchestratorDummy,
-    auth_context: UserAuthContext,
+    auth_context: StewardAuthContext,
 ) -> UUID4:
     """Create a new upload box. Requires Data Steward role."""
-    # Check if user has Data Steward role
-    if not check_data_steward_role(auth_context):
-        raise HttpNotAuthorizedError()
-
     try:
         box_id = await upload_service.create_research_data_upload_box(
             title=request.title,
@@ -218,13 +209,9 @@ async def update_research_data_upload_box(
 async def grant_upload_access(
     request: GrantAccessRequest,
     upload_service: UploadOrchestratorDummy,
-    auth_context: UserAuthContext,
+    auth_context: StewardAuthContext,
 ):
     """Grant upload access to a user. Requires Data Steward role."""
-    # Check if user has Data Steward role
-    if not check_data_steward_role(auth_context):
-        raise HttpNotAuthorizedError()
-
     try:
         await upload_service.grant_upload_access(
             user_id=request.user_id,
@@ -255,12 +242,9 @@ async def grant_upload_access(
 async def revoke_upload_access_grant(
     grant_id: UUID4,
     upload_service: UploadOrchestratorDummy,
-    auth_context: UserAuthContext,
+    auth_context: StewardAuthContext,
 ) -> None:
     """Revoke an upload access grant."""
-    if not check_data_steward_role(auth_context):
-        raise HttpNotAuthorizedError()
-
     try:
         await upload_service.revoke_upload_access_grant(grant_id)
     except UploadOrchestratorPort.GrantNotFoundError as err:
@@ -286,7 +270,7 @@ async def revoke_upload_access_grant(
 @TRACER.start_as_current_span("routes.get_upload_access_grants")
 async def get_upload_access_grants(  # noqa: PLR0913
     upload_service: UploadOrchestratorDummy,
-    auth_context: UserAuthContext,
+    auth_context: StewardAuthContext,
     user_id: Annotated[
         UUID4 | None,
         Query(
@@ -325,9 +309,6 @@ async def get_upload_access_grants(  # noqa: PLR0913
     You can filter the grants by user ID, IVA ID, and box ID
     and by whether the grant is currently valid or not.
     """
-    if not check_data_steward_role(auth_context):
-        raise HttpNotAuthorizedError()
-
     try:
         return await upload_service.get_upload_access_grants(
             user_id=user_id, iva_id=iva_id, box_id=box_id, valid=valid
