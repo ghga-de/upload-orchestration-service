@@ -94,13 +94,13 @@ async def prepare_core(
         box_dao = await get_box_dao(
             config=config, dao_publisher_factory=dao_publisher_factory
         )
-        claims_client = AccessClient(config=config)
+        access_client = AccessClient(config=config)
         file_upload_box_client = FileBoxClient(config=config)
 
         yield UploadOrchestrator(
             box_dao=box_dao,
             audit_repository=audit_repository,
-            access_client=claims_client,
+            access_client=access_client,
             file_upload_box_client=file_upload_box_client,
         )
 

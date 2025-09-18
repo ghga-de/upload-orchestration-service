@@ -24,7 +24,7 @@ from uos.core.models import UploadGrant
 
 
 class AccessClientPort(ABC):
-    """An adapter for interacting with the access API to manage upload access claims"""
+    """An adapter for interacting with the access API to manage upload access grants"""
 
     class AccessAPIError(RuntimeError):
         """Raised when there's an error while communicating with the Access API"""
