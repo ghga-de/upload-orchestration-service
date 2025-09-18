@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 auth_provider = DependencyDummy("auth_provider")
-upload_orchestrator_port = DependencyDummy("work_package_repo_port")
+upload_orchestrator_port = DependencyDummy("upload_orchestrator_port")
 
 AuthProviderDummy = Annotated[AuthContextProtocol[AuthContext], Depends(auth_provider)]
 UploadOrchestratorDummy = Annotated[

@@ -93,39 +93,39 @@ class AccessClientPort(ABC):
         ...
 
 
-class UCSClientPort(ABC):
-    """An adapter for interacting with the UCS.
+class FileBoxClientPort(ABC):
+    """An adapter for interacting with the service that owns FileUploadBoxes.
 
     This class is responsible for WOT generation and all pertinent error handling.
     """
 
-    class UCSCallError(RuntimeError):
-        """Raised when there's an error while communicating with the UCS"""
+    class OperationError(RuntimeError):
+        """Raised when there's an error while communicating with the service"""
 
     @abstractmethod
     async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
-        """Create a new FileUploadBox in UCS.
+        """Create a new FileUploadBox in owning service.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         ...
 
     @abstractmethod
     async def lock_file_upload_box(self, *, box_id: UUID4) -> None:
-        """Lock a FileUploadBox in UCS.
+        """Lock a FileUploadBox in the owning service.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         ...
 
     @abstractmethod
     async def unlock_file_upload_box(self, *, box_id: UUID4) -> None:
-        """Unlock a FileUploadBox in UCS.
+        """Unlock a FileUploadBox in the owning service.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         ...
 
@@ -134,6 +134,6 @@ class UCSClientPort(ABC):
         """Get list of file IDs in a FileUploadBox.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         ...

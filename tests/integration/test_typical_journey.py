@@ -26,7 +26,7 @@ from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
 from uos.core.models import (
-    ClaimValidity,
+    GrantValidity,
     ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
 )
@@ -46,7 +46,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     - Setting the state to LOCKED
     """
     # Test data
-    ucs_url = joint_fixture.config.ucs_url
+    file_box_service_url = joint_fixture.config.file_box_service_url
     access_url = joint_fixture.config.access_url
     ds_user_id = uuid4()
     regular_user_id = uuid4()
@@ -78,7 +78,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     # 1. Creating a box (requires data steward)
     httpx_mock.add_response(
         method="POST",
-        url=f"{ucs_url}/boxes",
+        url=f"{file_box_service_url}/boxes",
         status_code=201,
         json=str(file_upload_box_id),
     )
@@ -110,7 +110,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         url=f"{access_url}/upload-access/users/{regular_user_id}/ivas/{iva_id}/boxes/{box_id}",
         status_code=200,
     )
-    validity = ClaimValidity(
+    validity = GrantValidity(
         valid_from=now_utc_ms_prec(),
         valid_until=now_utc_ms_prec() + timedelta(days=7),
     )
@@ -193,7 +193,9 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     # 6. Setting the state to LOCKED
     lock_request = UpdateUploadBoxRequest(state=ResearchDataUploadBoxState.LOCKED)
     httpx_mock.add_response(
-        method="PATCH", url=f"{ucs_url}/boxes/{file_upload_box_id}", status_code=204
+        method="PATCH",
+        url=f"{file_box_service_url}/boxes/{file_upload_box_id}",
+        status_code=204,
     )
     await joint_fixture.upload_orchestrator.update_research_data_upload_box(
         box_id=box_id,

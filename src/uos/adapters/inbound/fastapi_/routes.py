@@ -39,7 +39,6 @@ from uos.core.models import (
     GrantAccessRequest,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
-    SortOrder,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
@@ -49,7 +48,7 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 TAGS: list[str | Enum] = ["UploadOrchestrationService"]
-# TODO: fill in possible response codes (but don't define all the text like in UCS)
+# TODO: fill in possible response codes
 
 
 def check_data_steward_role(auth_context: UserAuthContext) -> bool:
@@ -92,10 +91,6 @@ async def get_research_data_upload_boxes(
             description="Maximum number of research data upload boxes to return",
         ),
     ] = None,
-    sort: Annotated[
-        SortOrder,
-        Query(description="Sort order(s) that shall be used when sorting results"),
-    ] = SortOrder.ASCENDING,
 ) -> BoxRetrievalResults:
     """Get list of all research data upload boxes with pagination support."""
     if skip and limit and (skip >= limit):
@@ -103,7 +98,6 @@ async def get_research_data_upload_boxes(
             message="Skip must be less than limit",
             skip=skip,
             limit=limit,
-            sort=sort.value,
         )
 
     try:
@@ -111,7 +105,6 @@ async def get_research_data_upload_boxes(
             auth_context=auth_context,
             skip=skip,
             limit=limit,
-            sort=sort,
         )
         return results
     except Exception as err:

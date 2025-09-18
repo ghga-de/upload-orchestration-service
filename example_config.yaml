@@ -21,6 +21,7 @@ cors_exposed_headers: null
 db_name: uos
 docs_url: /docs
 enable_opentelemetry: false
+file_box_service_url: http://127.0.0.1/upload
 file_upload_box_topic: file-upload-boxes
 generate_correlation_id: true
 host: 127.0.0.1
@@ -48,6 +49,5 @@ port: 8080
 research_data_upload_box_topic: research-data-upload-boxes
 service_instance_id: '1'
 service_name: uos
-ucs_url: http://127.0.0.1/upload
 work_order_signing_key: '**********'
 workers: 1

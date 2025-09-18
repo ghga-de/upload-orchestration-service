@@ -27,7 +27,7 @@ from tests.fixtures import ConfigFixture
 from uos.core.models import BoxRetrievalResults, GrantWithBoxInfo, ResearchDataUploadBox
 from uos.inject import prepare_rest_app
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
-from uos.ports.outbound.http import UCSClientPort
+from uos.ports.outbound.http import FileBoxClientPort
 
 pytestmark = pytest.mark.asyncio()
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
@@ -188,10 +188,10 @@ async def test_create_research_data_upload_box(
         assert response.status_code == 201
         assert response.json() == str(test_box_id)
 
-        # handle UCS error from core
+        # handle file box service error from core
         orchestrator.reset_mock()
         orchestrator.create_research_data_upload_box.side_effect = (
-            UCSClientPort.UCSCallError()
+            FileBoxClientPort.OperationError()
         )
         response = await rest_client.post(
             url, json=request_data, headers=ds_auth_headers
@@ -266,10 +266,10 @@ async def test_update_research_data_upload_box(
         )
         assert response.status_code == 404
 
-        # handle UCS error from core
+        # handle file box service error from core
         orchestrator.reset_mock()
         orchestrator.update_research_data_upload_box.side_effect = (
-            UCSClientPort.UCSCallError()
+            FileBoxClientPort.OperationError()
         )
         response = await rest_client.patch(
             url, json=request_data, headers=user_auth_headers
@@ -390,7 +390,7 @@ async def test_list_upload_box_files(
         response = await rest_client.get(url, headers=user_auth_headers)
         assert response.status_code == 404
 
-        # handle other exception (including UCS errors that bubble up)
+        # handle other exception (including FileBoxClient errors that bubble up)
         orchestrator.reset_mock()
         orchestrator.get_upload_box_files.side_effect = TypeError()
         response = await rest_client.get(url, headers=user_auth_headers)
@@ -587,7 +587,6 @@ async def test_get_boxes(
         {"limit": -1},
         {"limit": "abc"},
         {"skip": 10, "limit": 5},
-        {"sort": "bad"},
     ],
 )
 async def test_get_boxes_bad_parameters(config: ConfigFixture, ds_auth_headers, params):

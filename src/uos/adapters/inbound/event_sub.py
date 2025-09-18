@@ -63,7 +63,7 @@ class OutboxSubTranslator(DaoSubscriberProtocol):
         await self._upload_orchestrator.upsert_file_upload_box(file_upload_box=update)
 
     async def deleted(self, resource_id: str) -> None:
-        """Consume a deleted FileUploadBox event and remove from own storage"""
+        """Consume a deleted FileUploadBox event -- these don't exist and are ignored"""
         log.warning(
             "Encountered 'deleted' event for FileUploadBox %s. Ignoring.", resource_id
         )

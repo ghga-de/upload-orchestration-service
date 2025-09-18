@@ -22,7 +22,7 @@ from uuid import UUID
 import httpx
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from jwcrypto import jwk
-from pydantic import UUID4, Field, SecretStr
+from pydantic import UUID4, Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings
 
 from uos.core.models import (
@@ -33,7 +33,7 @@ from uos.core.models import (
     ViewFileBoxWorkOrder,
 )
 from uos.core.tokens import sign_work_order_token
-from uos.ports.outbound.http import AccessClientPort, UCSClientPort
+from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
 
 TIMEOUT = 60
 
@@ -43,20 +43,20 @@ log = logging.getLogger(__name__)
 class AccessApiConfig(BaseSettings):
     """Config parameters for managing upload access grants."""
 
-    access_url: str = Field(
+    access_url: HttpUrl = Field(
         ...,
         description="URL pointing to the internal access API.",
         examples=["http://127.0.0.1/access"],
     )
 
 
-class UCSApiConfig(BaseSettings):
-    """Config parameters for interacting with the UCS."""
+class FileBoxClientConfig(BaseSettings):
+    """Config parameters for interacting with the service owning FileUploadBoxes."""
 
-    # maybe this should be a WKVS call? solve later
-    ucs_url: str = Field(
+    file_box_service_url: HttpUrl = Field(
         ...,
-        description="URL pointing to the UCS API.",
+        description="URL pointing to the API of the service that owns FileUploadBoxes"
+        + " (currently the UCS).",
         examples=["http://127.0.0.1/upload"],
     )
     work_order_signing_key: SecretStr = Field(
@@ -137,7 +137,7 @@ class AccessClient(AccessClientPort):
                     "response_text": response.text,
                 },
             )
-            raise self.AccessAPIError("Failed to grant upload access.")
+            raise self.AccessAPIError("Failed to revoke upload access.")
 
     async def get_upload_access_grants(
         self,
@@ -222,21 +222,20 @@ class AccessClient(AccessClientPort):
             # 200 means user has access, 403/404 means no access
             if response.status_code == 200:
                 return True
-            elif response.status_code in (403, 404):
+            if response.status_code in (403, 404):
                 return False
-            else:
-                log.error(
-                    "Unexpected response when checking box access for user %s and box %s.",
-                    user_id,
-                    box_id,
-                    extra={
-                        "user_id": user_id,
-                        "box_id": box_id,
-                        "status_code": response.status_code,
-                        "response_body": response.text,
-                    },
-                )
-                raise self.AccessAPIError("Failed to check box access.")
+            log.error(
+                "Unexpected response when checking box access for user %s and box %s.",
+                user_id,
+                box_id,
+                extra={
+                    "user_id": user_id,
+                    "box_id": box_id,
+                    "status_code": response.status_code,
+                    "response_body": response.text,
+                },
+            )
+            raise self.AccessAPIError("Failed to check box access.")
 
         except httpx.RequestError as err:
             log.error(
@@ -249,14 +248,14 @@ class AccessClient(AccessClientPort):
             raise self.AccessAPIError("Failed to check box access.") from err
 
 
-class UCSClient(UCSClientPort):
-    """An adapter for interacting with the UCS.
+class FileBoxClient(FileBoxClientPort):
+    """An adapter for interacting with the service that owns FileUploadBoxes.
 
     This class is responsible for WOT generation and all pertinent error handling.
     """
 
-    def __init__(self, *, config: UCSApiConfig):
-        self._ucs_url = config.ucs_url
+    def __init__(self, *, config: FileBoxClientConfig):
+        self._file_box_service_url = config.file_box_service_url
         self._signing_key = jwk.JWK.from_json(
             config.work_order_signing_key.get_secret_value()
         )
@@ -271,98 +270,102 @@ class UCSClient(UCSClientPort):
         return headers
 
     async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
-        """Create a new FileUploadBox in UCS.
+        """Create a new FileUploadBox in owning service.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         headers = self._auth_header(CreateFileBoxWorkOrder())
         body = {"storage_alias": storage_alias}
-        response = httpx.post(f"{self._ucs_url}/boxes", headers=headers, json=body)
+        response = httpx.post(
+            f"{self._file_box_service_url}/boxes", headers=headers, json=body
+        )
         if response.status_code != 201:
             log.error(
-                "Error creating new FileUploadBox in the UCS with storage alias %s.",
+                "Error creating new FileUploadBox in external service with storage alias %s.",
                 storage_alias,
                 extra={
                     "status_code": response.status_code,
                     "response_text": response.text,
                 },
             )
-            raise self.UCSCallError("Failed to create new FileUploadBox.")
+            raise self.OperationError("Failed to create new FileUploadBox.")
         try:
             box_id = response.json()
             return UUID(box_id)
         except Exception as err:
             msg = "Failed to extract box ID from response body."
             log.error(msg, exc_info=True)
-            raise self.UCSCallError(msg) from err
+            raise self.OperationError(msg) from err
 
     async def lock_file_upload_box(self, *, box_id: UUID4) -> None:
-        """Lock a FileUploadBox in UCS.
+        """Lock a FileUploadBox in the owning service.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         wot = ChangeFileBoxWorkOrder(work_type="lock", box_id=box_id)
         headers = self._auth_header(wot)
         body = {"lock": True}
         response = httpx.patch(
-            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+            f"{self._file_box_service_url}/boxes/{box_id}", headers=headers, json=body
         )
         if response.status_code != 204:
             log.error(
-                "Error locking FileUploadBox ID %s in the UCS.",
+                "Error locking FileUploadBox ID %s in external service.",
                 box_id,
                 extra={
                     "status_code": response.status_code,
                     "response_text": response.text,
                 },
             )
-            raise self.UCSCallError("Failed to lock FileUploadBox.")
+            raise self.OperationError("Failed to lock FileUploadBox.")
 
     async def unlock_file_upload_box(self, *, box_id: UUID4) -> None:
-        """Unlock a FileUploadBox in UCS.
+        """Unlock a FileUploadBox in the owning service.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         wot = ChangeFileBoxWorkOrder(work_type="unlock", box_id=box_id)
 
         headers = self._auth_header(wot)
         body = {"lock": False}
         response = httpx.patch(
-            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+            f"{self._file_box_service_url}/boxes/{box_id}", headers=headers, json=body
         )
         if response.status_code != 204:
             log.error(
-                "Error unlocking FileUploadBox ID %s in the UCS.",
+                "Error unlocking FileUploadBox ID %s in external service.",
                 box_id,
                 extra={
                     "status_code": response.status_code,
                     "response_text": response.text,
                 },
             )
-            raise self.UCSCallError("Failed to unlock FileUploadBox.")
+            raise self.OperationError("Failed to unlock FileUploadBox.")
 
     async def get_file_upload_list(self, *, box_id: UUID4) -> list[UUID4]:
         """Get list of file IDs in a FileUploadBox.
 
         Raises:
-            UCSCallError if there's a problem with the operation.
+            OperationError if there's a problem with the operation.
         """
         wot = ViewFileBoxWorkOrder(box_id=box_id)
         headers = self._auth_header(wot)
-        response = httpx.get(f"{self._ucs_url}/boxes/{box_id}/uploads", headers=headers)
+        response = httpx.get(
+            f"{self._file_box_service_url}/boxes/{box_id}/uploads", headers=headers
+        )
         if response.status_code != 200:
             log.error(
-                "Error unlocking FileUploadBox ID %s in the UCS.",
+                "Error unlocking FileUploadBox ID %s in external service.",
                 box_id,
                 extra={
                     "status_code": response.status_code,
                     "response_body": response.json(),
                 },
             )
-            raise self.UCSCallError("Failed to unlock FileUploadBox.")
+            raise self.OperationError("Failed to unlock FileUploadBox.")
 
         try:
             files = response.json()
@@ -370,4 +373,4 @@ class UCSClient(UCSClientPort):
         except Exception as err:
             msg = "Failed to extract list of file IDs from response body."
             log.error(msg, exc_info=True)
-            raise self.UCSCallError(msg) from err
+            raise self.OperationError(msg) from err

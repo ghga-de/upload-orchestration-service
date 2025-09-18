@@ -4,7 +4,7 @@ mongo_dsn: mongodb://localhost:27017
 db_name: uos
 mongo_timeout: 300
 auth_key: "{}"
-ucs_url: http://127.0.0.1/upload
+file_box_service_url: http://127.0.0.1/upload
 access_url: http://127.0.0.1/access
 audit_record_topic: audit-records
 audit_record_type: audit_record_logged

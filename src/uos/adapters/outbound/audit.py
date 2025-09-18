@@ -97,6 +97,3 @@ class AuditRepository(AuditRepositoryPort):
             entity=ResearchDataUploadBox.__name__,
             entity_id=str(box_id),
         )
-
-    # TODO: How should we log reads? If we log every result from search, we could
-    #  end up with a ton of meaningless logs

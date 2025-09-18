@@ -23,11 +23,10 @@ from pydantic import UUID4
 
 from uos.core.models import (
     BoxRetrievalResults,
-    ClaimValidity,
     FileUploadBox,
+    GrantValidity,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
-    SortOrder,
     UpdateUploadBoxRequest,
 )
 
@@ -64,7 +63,7 @@ class UploadOrchestratorPort(ABC):
         """Create a new research data upload box.
 
         This operation:
-        1. Creates a FileUploadBox in the UCS
+        1. Creates a FileUploadBox in the service that owns them
         2. Creates a ResearchDataUploadBox locally
         3. Emits events and audit records
 
@@ -72,7 +71,7 @@ class UploadOrchestratorPort(ABC):
             The UUID of the newly created upload box
 
         Raises:
-            UCSCallError: if there's a problem creating a corresponding box in the UCS.
+            OperationError: if there's a problem creating a corresponding FileUploadBox.
         """
         ...
 
@@ -89,7 +88,7 @@ class UploadOrchestratorPort(ABC):
         Raises:
             BoxNotFoundError: If the box doesn't exist.
             BoxAccessError: If the user doesn't have access to the box.
-            UCSCallError: if there's a problem updating the corresponding box in the UCS.
+            OperationError: if there's a problem updating the corresponding FileUploadBox.
         """
         ...
 
@@ -100,7 +99,7 @@ class UploadOrchestratorPort(ABC):
         user_id: UUID4,
         iva_id: UUID4,
         box_id: UUID4,
-        validity: ClaimValidity,
+        validity: GrantValidity,
         granting_user_id: UUID4,
     ) -> None:
         """Grant upload access to a user for a specific upload box.
@@ -144,7 +143,7 @@ class UploadOrchestratorPort(ABC):
         box_id: UUID4,
         auth_context: AuthContext,
     ) -> Sequence[UUID4]:
-        """Get list of file IDs for an upload box.
+        """Get list of file IDs for a research data upload box.
 
         Returns:
             Sequence of file IDs in the upload box
@@ -152,13 +151,13 @@ class UploadOrchestratorPort(ABC):
         Raises:
             BoxNotFoundError: If the box doesn't exist.
             BoxAccessError: If the user doesn't have access to the box.
-            UCSCallError: if there's a problem querying the UCS.
+            OperationError: if there's a problem querying the file box service.
         """
         ...
 
     @abstractmethod
     async def upsert_file_upload_box(self, file_upload_box: FileUploadBox) -> None:
-        """Handle FileUploadBox update events from UCS.
+        """Handle FileUploadBox update events from file box service.
 
         Updates the corresponding ResearchDataUploadBox with latest file count and size.
         """
@@ -182,14 +181,13 @@ class UploadOrchestratorPort(ABC):
         auth_context: AuthContext,
         skip: int | None = None,
         limit: int | None = None,
-        sort: SortOrder = SortOrder.ASCENDING,
     ) -> BoxRetrievalResults:
         """Retrieve all Research Data Upload Boxes, optionally paginated.
 
         For data stewards, returns all boxes. For regular users, only returns boxes
         they have access to according to the Access API.
 
-        Results are sorted alphabetically by title, ascending by default.
+        Results are sorted alphabetically by title.
 
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """

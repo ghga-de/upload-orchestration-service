@@ -25,7 +25,7 @@ from hexkit.providers.mongokafka import MongoKafkaConfig
 from uos.adapters.inbound.event_sub import OutboxSubConfig
 from uos.adapters.outbound.dao import OutboxPubConfig
 from uos.adapters.outbound.event_pub import EventPubConfig
-from uos.adapters.outbound.http import AccessApiConfig, UCSApiConfig
+from uos.adapters.outbound.http import AccessApiConfig, FileBoxClientConfig
 from uos.constants import SERVICE_NAME
 
 __all__ = ["Config"]
@@ -39,7 +39,7 @@ class Config(
     OpenTelemetryConfig,
     MongoKafkaConfig,
     AccessApiConfig,
-    UCSApiConfig,
+    FileBoxClientConfig,
     EventPubConfig,
     OutboxSubConfig,
     OutboxPubConfig,

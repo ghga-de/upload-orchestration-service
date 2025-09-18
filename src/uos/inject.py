@@ -37,7 +37,7 @@ from uos.adapters.inbound.fastapi_.configure import get_configured_app
 from uos.adapters.outbound.audit import AuditRepository
 from uos.adapters.outbound.dao import get_box_dao
 from uos.adapters.outbound.event_pub import EventPubTranslator
-from uos.adapters.outbound.http import AccessClient, UCSClient
+from uos.adapters.outbound.http import AccessClient, FileBoxClient
 from uos.config import Config
 from uos.constants import SERVICE_NAME
 from uos.core.orchestrator import UploadOrchestrator
@@ -95,13 +95,13 @@ async def prepare_core(
             config=config, dao_publisher_factory=dao_publisher_factory
         )
         claims_client = AccessClient(config=config)
-        ucs_client = UCSClient(config=config)
+        file_upload_box_client = FileBoxClient(config=config)
 
         yield UploadOrchestrator(
             box_dao=box_dao,
             audit_repository=audit_repository,
             access_client=claims_client,
-            ucs_client=ucs_client,
+            file_upload_box_client=file_upload_box_client,
         )
 
 

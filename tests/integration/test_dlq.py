@@ -29,9 +29,9 @@ from uos.inject import prepare_event_subscriber
 pytestmark = pytest.mark.asyncio()
 UPSERTED = "upserted"
 
-TEST_UCS_BOX_ID = UUID("f139ab68-56cc-4ca1-8866-2ffc8f297728")
+TEST_FILE_UPLOAD_BOX_ID = UUID("f139ab68-56cc-4ca1-8866-2ffc8f297728")
 TEST_PAYLOAD: dict[str, Any] = {
-    "id": str(TEST_UCS_BOX_ID),
+    "id": str(TEST_FILE_UPLOAD_BOX_ID),
     "locked": False,
     "file_count": 0,
     "size": 0,
@@ -53,7 +53,7 @@ async def test_use_dlq_on_failure(kafka: KafkaFixture):
     await kafka.publish_event(
         topic=config.file_upload_box_topic,
         type_=UPSERTED,
-        key=str(TEST_UCS_BOX_ID),
+        key=str(TEST_FILE_UPLOAD_BOX_ID),
         payload={"some-field": "some-value"},
     )
 
@@ -68,7 +68,7 @@ async def test_use_dlq_on_failure(kafka: KafkaFixture):
     # Check that the event was published to the DLQ
     assert len(dlq_recorder.recorded_events) == 1
     event = dlq_recorder.recorded_events[0]
-    assert event.key == str(TEST_UCS_BOX_ID)
+    assert event.key == str(TEST_FILE_UPLOAD_BOX_ID)
     assert event.type_ == UPSERTED
     assert event.payload == {"some-field": "some-value"}
 
@@ -86,7 +86,7 @@ async def test_reconsume_from_retry(kafka: KafkaFixture):
     await kafka.publish_event(
         topic=f"retry-{config.service_name}",
         type_=UPSERTED,
-        key=str(TEST_UCS_BOX_ID),
+        key=str(TEST_FILE_UPLOAD_BOX_ID),
         payload=TEST_PAYLOAD,
         headers={HeaderNames.ORIGINAL_TOPIC: config.file_upload_box_topic},
     )

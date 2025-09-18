@@ -28,11 +28,11 @@ from tests.fixtures.in_mem_dao import BaseInMemDao, InMemBoxDao
 from uos.config import Config
 from uos.core import models
 from uos.core.orchestrator import UploadOrchestrator
-from uos.ports.outbound.http import AccessClientPort, UCSClientPort
+from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
 
 pytestmark = pytest.mark.asyncio()
 
-TEST_UCS_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
+TEST_FILE_UPLOAD_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
 
 # Auth context constants for testing
@@ -51,7 +51,7 @@ class JointRig:
 
     config: Config
     box_dao: BaseInMemDao[models.ResearchDataUploadBox]
-    ucs_client: UCSClientPort
+    file_upload_box_client: FileBoxClientPort
     access_client: AccessClientPort
     controller: UploadOrchestrator
 
@@ -60,13 +60,13 @@ class JointRig:
 def rig(config: ConfigFixture) -> JointRig:
     """Return a joint fixture with in-memory dependency mocks"""
     _config = config.config
-    ucs_client_mock = AsyncMock()
-    ucs_client_mock.create_file_upload_box.return_value = TEST_UCS_BOX_ID
+    file_box_client_mock = AsyncMock()
+    file_box_client_mock.create_file_upload_box.return_value = TEST_FILE_UPLOAD_BOX_ID
     access_client_mock = AsyncMock()
 
     controller = UploadOrchestrator(
         box_dao=(box_dao := InMemBoxDao()),  # type: ignore
-        ucs_client=ucs_client_mock,
+        file_upload_box_client=file_box_client_mock,
         access_client=access_client_mock,
         audit_repository=AsyncMock(),
     )
@@ -74,7 +74,7 @@ def rig(config: ConfigFixture) -> JointRig:
     return JointRig(
         config=_config,
         box_dao=box_dao,
-        ucs_client=ucs_client_mock,
+        file_upload_box_client=file_box_client_mock,
         access_client=access_client_mock,
         controller=controller,
     )
@@ -97,7 +97,7 @@ async def test_create_research_data_upload_box(rig: JointRig):
     assert box.changed_by == TEST_DS_ID
     assert box.file_count == 0
     assert box.size == 0
-    assert box.file_upload_box_id == TEST_UCS_BOX_ID
+    assert box.file_upload_box_id == TEST_FILE_UPLOAD_BOX_ID
     assert box.last_changed - now_utc_ms_prec() < timedelta(seconds=5)
     assert box.locked == False
     assert box.state == "open"
@@ -162,7 +162,7 @@ async def test_update_research_data_upload_box_not_found(rig: JointRig):
 
 
 async def test_get_upload_box_files_happy(rig: JointRig):
-    """Test the normal path of getting a list of file IDs for a box from the UCS."""
+    """Test the normal path of getting a list of file IDs for a box from the file box service."""
     # First create a box
     box_id = await rig.controller.create_research_data_upload_box(
         title="Test Box",
@@ -171,9 +171,9 @@ async def test_get_upload_box_files_happy(rig: JointRig):
         user_id=TEST_DS_ID,
     )
 
-    # Mock the UCS client to return a list of file IDs
+    # Mock the file box client to return a list of file IDs
     test_file_ids = sorted([uuid4(), uuid4(), uuid4()])
-    rig.ucs_client.get_file_upload_list.return_value = test_file_ids  # type: ignore
+    rig.file_upload_box_client.get_file_upload_list.return_value = test_file_ids  # type: ignore
 
     # Mock the access client for non-data steward case
     rig.access_client.get_accessible_upload_boxes.return_value = [box_id]  # type: ignore
@@ -186,8 +186,8 @@ async def test_get_upload_box_files_happy(rig: JointRig):
     # Verify the results
     assert result == test_file_ids
 
-    # Verify the UCS client was called
-    rig.ucs_client.get_file_upload_list.assert_called_once()  # type: ignore
+    # Verify the file box client was called
+    rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
 
     # Verify access check was performed for non-data steward
     rig.access_client.get_accessible_upload_boxes.assert_called_once()  # type: ignore
@@ -221,8 +221,8 @@ async def test_get_upload_box_files_access_error(rig: JointRig):
     # Verify that access check was performed
     rig.access_client.get_accessible_upload_boxes.assert_called_once()  # type: ignore
 
-    # Verify that UCS client was NOT called since access was denied
-    rig.ucs_client.get_file_upload_list.assert_not_called()  # type: ignore
+    # Verify that file box client was NOT called since access was denied
+    rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
 
 
 async def test_get_upload_box_files_box_not_found(rig: JointRig):
@@ -240,8 +240,8 @@ async def test_get_upload_box_files_box_not_found(rig: JointRig):
     # Verify that access client was NOT called since the box lookup failed first
     rig.access_client.get_accessible_upload_boxes.assert_not_called()  # type: ignore
 
-    # Verify that UCS client was NOT called since the box lookup failed
-    rig.ucs_client.get_file_upload_list.assert_not_called()  # type: ignore
+    # Verify that file box client was NOT called since the box lookup failed
+    rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
 
 
 async def test_upsert_file_upload_box_happy(rig: JointRig):
@@ -262,7 +262,7 @@ async def test_upsert_file_upload_box_happy(rig: JointRig):
 
     # Create a FileUploadBox with updated data
     updated_file_upload_box = models.FileUploadBox(
-        id=TEST_UCS_BOX_ID,  # This should match the file_upload_box_id in our research box
+        id=TEST_FILE_UPLOAD_BOX_ID,  # This should match the file_upload_box_id in our research box
         locked=True,
         file_count=5,
         size=1024000,
@@ -325,7 +325,7 @@ async def test_get_research_data_upload_box_happy(rig: JointRig):
     assert result.description == "Test Description"
     assert result.storage_alias == "HD01"
     assert result.changed_by == TEST_DS_ID
-    assert result.file_upload_box_id == TEST_UCS_BOX_ID
+    assert result.file_upload_box_id == TEST_FILE_UPLOAD_BOX_ID
 
     # Verify access check was called
     rig.access_client.check_box_access.assert_called_once()  # type: ignore
@@ -522,7 +522,7 @@ async def test_get_boxes(rig: JointRig):
         )
         box_ids.append(box_id)
 
-    # Test 1: Data steward can see all boxes
+    # Data steward can see all boxes
     results = await rig.controller.get_research_data_upload_boxes(
         auth_context=DATA_STEWARD_AUTH_CONTEXT
     )
@@ -532,15 +532,6 @@ async def test_get_boxes(rig: JointRig):
     # Verify sorting by title (alphabetical, ascending by default)
     assert results.boxes[0].title == "Box A"
     assert results.boxes[4].title == "Box E"
-
-    # Check non-default sort order param
-    results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=DATA_STEWARD_AUTH_CONTEXT, sort=models.SortOrder.DESCENDING
-    )
-    assert results.count == 5
-    assert len(results.boxes) == 5
-    assert results.boxes[0].title == "Box E"
-    assert results.boxes[4].title == "Box A"
 
     # Verify pagination works for data stewards
     results = await rig.controller.get_research_data_upload_boxes(
@@ -574,7 +565,7 @@ async def test_get_boxes(rig: JointRig):
         user_id=regular_user_id
     )
 
-    # Test 5: Regular user with no accessible boxes
+    # Regular user with no accessible boxes
     rig.access_client.get_accessible_upload_boxes.reset_mock()  # type: ignore
     rig.access_client.get_accessible_upload_boxes.return_value = []  # type: ignore
 
@@ -586,6 +577,7 @@ async def test_get_boxes(rig: JointRig):
 
     # Verify pagination works for non-data stewards
     rig.access_client.get_accessible_upload_boxes.reset_mock()  # type: ignore
+
     # User has access to 3 boxes
     accessible_boxes = [box_ids[0], box_ids[2], box_ids[4]]  # Box A, Box C, Box E
     rig.access_client.get_accessible_upload_boxes.return_value = accessible_boxes  # type: ignore

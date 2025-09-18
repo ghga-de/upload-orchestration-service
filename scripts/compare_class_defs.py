@@ -19,10 +19,10 @@
 import inspect
 
 # Import the abstract base classes and their implementations
-from uos.adapters.outbound.http import AccessClient, UCSClient  # noqa: F401
+from uos.adapters.outbound.http import AccessClient, FileBoxClient  # noqa: F401
 from uos.core.orchestrator import UploadOrchestrator  # noqa: F401
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
-from uos.ports.outbound.http import AccessClientPort, UCSClientPort
+from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
 
 
 def print_links(abc_method: type, imp_method: type):
@@ -68,7 +68,7 @@ def check_implementation(abc_class: type):
 
 def main():
     """Test me"""
-    ports = [AccessClientPort, UCSClientPort, UploadOrchestratorPort]
+    ports = [AccessClientPort, FileBoxClientPort, UploadOrchestratorPort]
     for port in ports:
         check_implementation(port)
 

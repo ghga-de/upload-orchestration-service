@@ -102,7 +102,6 @@ class HttpPaginationError(HttpCustomExceptionBase):
 
         skip: int | None
         limit: int | None
-        sort: str
 
     def __init__(
         self,
@@ -110,12 +109,11 @@ class HttpPaginationError(HttpCustomExceptionBase):
         message: str = "There was a problem with the supplied pagination parameters.",
         skip: int | None,
         limit: int | None,
-        sort: str,
         status_code: int = 422,
     ):
         """Construct message and init the exception."""
         super().__init__(
             status_code=status_code,
             description=message,
-            data={"skip": skip, "limit": limit, "sort": sort},
+            data={"skip": skip, "limit": limit},
         )

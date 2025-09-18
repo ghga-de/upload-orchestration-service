@@ -15,7 +15,7 @@
 
 """Data models for the Upload Orchestration Service."""
 
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import Literal
 
 from ghga_service_commons.utils.utc_dates import UTCDatetime
@@ -32,7 +32,10 @@ from pydantic import (
 
 
 class FileUploadBox(BaseModel):
-    """A class representing a box that bundles files belonging to the same upload."""
+    """A class representing a box that bundles files belonging to the same upload.
+
+    These objects are owned by the UCS.
+    """
 
     id: UUID4 = Field(..., description="Unique identifier for the instance")
     locked: bool = Field(
@@ -45,7 +48,7 @@ class FileUploadBox(BaseModel):
 
 
 class FileUpload(BaseModel):
-    """A File Upload."""
+    """A File Upload. These objects are owned by the UCS."""
 
     upload_id: UUID4 = Field(..., description="Unique identifier for the file upload")
     completed: bool = Field(
@@ -84,7 +87,9 @@ class ResearchDataUploadBox(BaseModel):
     changed_by: UUID4 = Field(
         ..., description="ID of the user who performed the latest change"
     )
-    file_upload_box_id: UUID4 = Field(..., description="The ID of the file upload box.")
+    file_upload_box_id: UUID4 = Field(
+        ..., description="The ID of the corresponding file upload box."
+    )
     locked: bool = Field(
         default=False,
         description="Whether or not changes to the files in the file upload box are allowed",
@@ -175,8 +180,8 @@ class UpdateUploadBoxRequest(BaseModel):
     )
 
 
-class ClaimValidity(BaseModel):
-    """Start and end dates for validating claims."""
+class GrantValidity(BaseModel):
+    """Start and end dates for validating grants."""
 
     valid_from: UTCDatetime = Field(
         default=...,
@@ -202,7 +207,7 @@ class ClaimValidity(BaseModel):
 class GrantAccessRequest(BaseModel):
     """Request model for granting upload access to a user."""
 
-    validity: ClaimValidity
+    validity: GrantValidity
     user_id: UUID4 = Field(..., description="ID of the user to grant access to")
     iva_id: UUID4 = Field(..., description="ID of the IVA verification")
     box_id: UUID4 = Field(..., description="ID of the upload box")
@@ -240,13 +245,6 @@ class GrantWithBoxInfo(UploadGrant):
 
     title: str = Field(..., description="Short meaningful name for the box")
     description: str = Field(..., description="Describes the upload box in more detail")
-
-
-class SortOrder(Enum):
-    """Represents the possible sorting orders"""
-
-    ASCENDING = "ascending"
-    DESCENDING = "descending"
 
 
 class BoxRetrievalResults(BaseModel):

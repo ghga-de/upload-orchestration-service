@@ -94,7 +94,7 @@ The service requires the following configuration parameters:
   ```
 
 
-- <a id="properties/ucs_url"></a>**`ucs_url`** *(string, required)*: URL pointing to the UCS API.
+- <a id="properties/file_box_service_url"></a>**`file_box_service_url`** *(string, format: uri, required)*: URL pointing to the API of the service that owns FileUploadBoxes (currently the UCS). Length must be between 1 and 2083 (inclusive).
 
 
   Examples:
@@ -114,7 +114,7 @@ The service requires the following configuration parameters:
   ```
 
 
-- <a id="properties/access_url"></a>**`access_url`** *(string, required)*: URL pointing to the internal access API.
+- <a id="properties/access_url"></a>**`access_url`** *(string, format: uri, required)*: URL pointing to the internal access API. Length must be between 1 and 2083 (inclusive).
 
 
   Examples:

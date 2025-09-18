@@ -45,9 +45,7 @@ class EventPubConfig(AuditEventsConfig):
 
 
 class EventPubTranslator(EventPublisherPort):
-    """A translator according to  the triple hexagonal architecture implementing
-    the EventPublisherPort.
-    """
+    """A hexkit translator for publishing to the audit log."""
 
     def __init__(self, *, config: EventPubConfig, provider: EventPublisherProtocol):
         """Initialize with configs and a provider of the EventPublisherProtocol."""
