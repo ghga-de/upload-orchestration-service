@@ -60,36 +60,23 @@ components:
           format: uuid4
           title: User Id
           type: string
-        validity:
-          $ref: '#/components/schemas/GrantValidity'
-      required:
-      - validity
-      - user_id
-      - iva_id
-      - box_id
-      title: GrantAccessRequest
-      type: object
-    GrantValidity:
-      description: Start and end dates for validating grants.
-      properties:
         valid_from:
           description: Start date of validity
-          examples:
-          - '2023-01-01T00:00:00Z'
           format: date-time
           title: Valid From
           type: string
         valid_until:
           description: End date of validity
-          examples:
-          - '2023-12-31T23:59:59Z'
           format: date-time
           title: Valid Until
           type: string
       required:
       - valid_from
       - valid_until
-      title: GrantValidity
+      - user_id
+      - iva_id
+      - box_id
+      title: GrantAccessRequest
       type: object
     GrantWithBoxInfo:
       description: An UploadGrant with the ResearchDataUploadBox title and description.

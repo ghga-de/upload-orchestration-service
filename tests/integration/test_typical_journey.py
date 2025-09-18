@@ -26,7 +26,6 @@ from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
 from uos.core.models import (
-    GrantValidity,
     ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
 )
@@ -110,15 +109,14 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         url=f"{access_url}/upload-access/users/{regular_user_id}/ivas/{iva_id}/boxes/{box_id}",
         status_code=200,
     )
-    validity = GrantValidity(
-        valid_from=now_utc_ms_prec(),
-        valid_until=now_utc_ms_prec() + timedelta(days=7),
-    )
+    valid_from = now_utc_ms_prec()
+    valid_until = now_utc_ms_prec() + timedelta(days=7)
     await joint_fixture.upload_orchestrator.grant_upload_access(
         user_id=regular_user_id,
         iva_id=iva_id,
         box_id=box_id,
-        validity=validity,
+        valid_from=valid_from,
+        valid_until=valid_until,
         granting_user_id=ds_user_id,
     )
 

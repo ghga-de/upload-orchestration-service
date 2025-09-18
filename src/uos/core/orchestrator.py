@@ -20,6 +20,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ghga_service_commons.auth.ghga import AuthContext
+from ghga_service_commons.utils.utc_dates import UTCDatetime
 from hexkit.protocols.dao import NoHitsFoundError, ResourceNotFoundError
 from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
@@ -27,7 +28,6 @@ from pydantic import UUID4
 from uos.core.models import (
     BoxRetrievalResults,
     FileUploadBox,
-    GrantValidity,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     ResearchDataUploadBoxState,
@@ -160,13 +160,14 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # Create audit record
         await self._audit_repository.log_box_updated(box=updated_box, user_id=user_id)
 
-    async def grant_upload_access(
+    async def grant_upload_access(  # noqa: PLR0913
         self,
         *,
         user_id: UUID4,
         iva_id: UUID4,
         box_id: UUID4,
-        validity: GrantValidity,
+        valid_from: UTCDatetime,
+        valid_until: UTCDatetime,
         granting_user_id: UUID4,
     ) -> None:
         """Grant upload access to a user for a specific research data upload box.
@@ -183,8 +184,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
             user_id=user_id,
             iva_id=iva_id,
             box_id=box_id,
-            valid_from=validity.valid_from,
-            valid_until=validity.valid_until,
+            valid_from=valid_from,
+            valid_until=valid_until,
         )
         await self._audit_repository.log_access_granted(
             box_id=box_id, grantor_id=granting_user_id, grantee_id=user_id

@@ -19,12 +19,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ghga_service_commons.auth.ghga import AuthContext
+from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
 from uos.core.models import (
     BoxRetrievalResults,
     FileUploadBox,
-    GrantValidity,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
@@ -93,13 +93,14 @@ class UploadOrchestratorPort(ABC):
         ...
 
     @abstractmethod
-    async def grant_upload_access(
+    async def grant_upload_access(  # noqa: PLR0913
         self,
         *,
         user_id: UUID4,
         iva_id: UUID4,
         box_id: UUID4,
-        validity: GrantValidity,
+        valid_from: UTCDatetime,
+        valid_until: UTCDatetime,
         granting_user_id: UUID4,
     ) -> None:
         """Grant upload access to a user for a specific research data upload box.

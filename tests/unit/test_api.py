@@ -301,10 +301,8 @@ async def test_grant_upload_access(
             "user_id": str(uuid4()),
             "iva_id": str(uuid4()),
             "box_id": str(TEST_BOX_ID),
-            "validity": {
-                "valid_from": now_utc_ms_prec().isoformat(),
-                "valid_until": (now_utc_ms_prec() + timedelta(minutes=180)).isoformat(),
-            },
+            "valid_from": now_utc_ms_prec().isoformat(),
+            "valid_until": (now_utc_ms_prec() + timedelta(minutes=180)).isoformat(),
         }
 
         # unauthenticated

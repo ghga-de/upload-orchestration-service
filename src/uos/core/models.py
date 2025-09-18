@@ -180,19 +180,14 @@ class UpdateUploadBoxRequest(BaseModel):
     )
 
 
-class GrantValidity(BaseModel):
-    """Start and end dates for validating grants."""
+class GrantAccessRequest(BaseModel):
+    """Request model for granting upload access to a user."""
 
-    valid_from: UTCDatetime = Field(
-        default=...,
-        description="Start date of validity",
-        examples=["2023-01-01T00:00:00Z"],
-    )
-    valid_until: UTCDatetime = Field(
-        default=...,
-        description="End date of validity",
-        examples=["2023-12-31T23:59:59Z"],
-    )
+    valid_from: UTCDatetime = Field(default=..., description="Start date of validity")
+    valid_until: UTCDatetime = Field(default=..., description="End date of validity")
+    user_id: UUID4 = Field(..., description="ID of the user to grant access to")
+    iva_id: UUID4 = Field(..., description="ID of the IVA verification")
+    box_id: UUID4 = Field(..., description="ID of the upload box")
 
     @field_validator("valid_until")
     @classmethod
@@ -202,15 +197,6 @@ class GrantValidity(BaseModel):
         if "valid_from" in data and value <= data["valid_from"]:
             raise ValueError("'valid_until' must be later than 'valid_from'")
         return value
-
-
-class GrantAccessRequest(BaseModel):
-    """Request model for granting upload access to a user."""
-
-    validity: GrantValidity
-    user_id: UUID4 = Field(..., description="ID of the user to grant access to")
-    iva_id: UUID4 = Field(..., description="ID of the IVA verification")
-    box_id: UUID4 = Field(..., description="ID of the upload box")
 
 
 class UploadGrant(BaseModel):
