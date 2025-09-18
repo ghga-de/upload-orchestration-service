@@ -16,8 +16,6 @@
 
 """Management of access tokens"""
 
-import hashlib
-import secrets
 import string
 
 from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
@@ -26,27 +24,11 @@ from jwcrypto import jwk
 from uos.constants import WORK_ORDER_TOKEN_VALID_SECONDS
 from uos.core.models import BaseWorkOrderToken
 
-__all__ = [
-    "generate_work_order_token",
-    "hash_token",
-    "sign_work_order_token",
-]
+__all__ = ["sign_work_order_token"]
 
 
 ACCESS_TOKEN_CHARSET = string.ascii_letters + string.digits
 ACCESS_TOKEN_LENGTH = 24
-
-
-def generate_work_order_token() -> str:
-    """Create a random access token consisting of ascii letters and digits."""
-    return "".join(
-        secrets.choice(ACCESS_TOKEN_CHARSET) for _ in range(ACCESS_TOKEN_LENGTH)
-    )
-
-
-def hash_token(token: str) -> str:
-    """Create a SHA-256 hash of the given token string as hex string."""
-    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def sign_work_order_token(
