@@ -68,7 +68,7 @@ class UploadOrchestratorPort(ABC):
         3. Emits events and audit records
 
         Returns:
-            The UUID of the newly created upload box
+            The UUID of the newly created research data upload box
 
         Raises:
             OperationError: if there's a problem creating a corresponding FileUploadBox.
@@ -86,8 +86,8 @@ class UploadOrchestratorPort(ABC):
         """Update a research data upload box.
 
         Raises:
-            BoxNotFoundError: If the box doesn't exist.
-            BoxAccessError: If the user doesn't have access to the box.
+            BoxNotFoundError: If the research data upload box doesn't exist.
+            BoxAccessError: If the user doesn't have access to the research data upload box.
             OperationError: if there's a problem updating the corresponding FileUploadBox.
         """
         ...
@@ -102,7 +102,7 @@ class UploadOrchestratorPort(ABC):
         validity: GrantValidity,
         granting_user_id: UUID4,
     ) -> None:
-        """Grant upload access to a user for a specific upload box.
+        """Grant upload access to a user for a specific research data upload box.
 
         Raises:
             AccessAPIError: if there's a problem communicating with the access API.
