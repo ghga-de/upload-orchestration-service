@@ -405,9 +405,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 user_id=user_id
             )
 
-            # Get all boxes and filter to only accessible ones
-            all_boxes = [x async for x in self._box_dao.find_all(mapping=mapping)]
-            boxes = [box for box in all_boxes if box.id in accessible_box_ids]
+            # Generally very few boxes per user, so make distinct call for each
+            boxes = [
+                await self._box_dao.get_by_id(box_id) for box_id in accessible_box_ids
+            ]
+            if locked is not None:
+                boxes = [x for x in boxes if x.locked == locked]
 
         count = len(boxes)
         boxes.sort(key=lambda x: x.title)
