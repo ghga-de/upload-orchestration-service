@@ -182,7 +182,7 @@ async def test_get_upload_box_files_happy(rig: JointRig):
     rig.file_upload_box_client.get_file_upload_list.return_value = test_file_ids  # type: ignore
 
     # Mock the access client for non-data steward case
-    rig.access_client.get_accessible_upload_boxes.return_value = [box_id]  # type: ignore
+    rig.access_client.check_box_access.return_value = [box_id]  # type: ignore
 
     # Call the method
     result = await rig.controller.get_upload_box_files(
@@ -196,7 +196,7 @@ async def test_get_upload_box_files_happy(rig: JointRig):
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
 
     # Verify access check was performed for non-data steward
-    rig.access_client.get_accessible_upload_boxes.assert_called_once()  # type: ignore
+    rig.access_client.check_box_access.assert_called_once()  # type: ignore
 
 
 async def test_get_upload_box_files_access_error(rig: JointRig):
@@ -210,22 +210,16 @@ async def test_get_upload_box_files_access_error(rig: JointRig):
     )
 
     # Mock the access client to return that the user does NOT have access to this box
-    rig.access_client.get_accessible_upload_boxes.return_value = []  # type: ignore
-
-    # Create a mock auth context for a different user (not data steward)
-    different_user_id = uuid4()
-    different_user_auth_context = Mock()
-    different_user_auth_context.id = str(different_user_id)
-    different_user_auth_context.roles = []
+    rig.access_client.check_box_access.return_value = False  # type: ignore
 
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_upload_box_files(
-            box_id=box_id, auth_context=different_user_auth_context
+            box_id=box_id, auth_context=OTHER_USER_AUTH_CONTEXT
         )
 
     # Verify that access check was performed
-    rig.access_client.get_accessible_upload_boxes.assert_called_once()  # type: ignore
+    rig.access_client.check_box_access.assert_called_once()  # type: ignore
 
     # Verify that file box client was NOT called since access was denied
     rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore

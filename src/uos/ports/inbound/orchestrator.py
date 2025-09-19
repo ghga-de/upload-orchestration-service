@@ -153,6 +153,7 @@ class UploadOrchestratorPort(ABC):
             BoxNotFoundError: If the box doesn't exist.
             BoxAccessError: If the user doesn't have access to the box.
             OperationError: if there's a problem querying the file box service.
+            AccessAPIError: If there's a problem querying the access api
         """
         ...
 

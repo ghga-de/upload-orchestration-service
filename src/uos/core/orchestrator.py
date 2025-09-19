@@ -275,25 +275,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
             BoxNotFoundError: If the box doesn't exist.
             BoxAccessError: If the user doesn't have access to the box.
             OperationError: if there's a problem querying the file box service.
+            AccessAPIError: If there's a problem querying the access api
         """
         # Verify access
-        try:
-            upload_box = await self._box_dao.get_by_id(box_id)
-        except ResourceNotFoundError as err:
-            raise self.BoxNotFoundError(box_id=box_id) from err
-
-        is_ds = is_data_steward(auth_context)
-        user_id = UUID(auth_context.id)
-
-        if not is_ds:
-            # Check if user has access to this box
-            accessible_boxes = await self._access_client.get_accessible_upload_boxes(
-                user_id
-            )
-            if box_id not in accessible_boxes:
-                raise self.BoxAccessError(
-                    f"User {user_id} does not have access to upload box {box_id}"
-                )
+        upload_box = await self.get_research_data_upload_box(
+            box_id=box_id, auth_context=auth_context
+        )
 
         # Get file list from file box service
         file_ids = await self._file_upload_box_client.get_file_upload_list(
