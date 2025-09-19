@@ -43,6 +43,11 @@ log = logging.getLogger(__name__)
 __all__ = ["UploadOrchestrator"]
 
 
+def is_data_steward(auth_context: AuthContext) -> bool:
+    """Returns a bool indicating if the auth context is for a Data Steward"""
+    return "data_steward" in auth_context.roles
+
+
 class UploadOrchestrator(UploadOrchestratorPort):
     """A class for orchestrating upload operations."""
 
@@ -116,8 +121,9 @@ class UploadOrchestrator(UploadOrchestratorPort):
             OperationError: if there's a problem updating the corresponding FileUploadBox.
         """
         # Get existing box if user has access to it
-        user_id = UUID(auth_context.id)
-        box = await self.get_research_data_upload_box(box_id=box_id, user_id=user_id)
+        box = await self.get_research_data_upload_box(
+            box_id=box_id, auth_context=auth_context
+        )
         changed_fields = {
             k: v for k, v in request.model_dump().items() if v and getattr(box, k) != v
         }
@@ -154,6 +160,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Update the research data upload box in the DB
         updated_box.last_changed = now_utc_ms_prec()
+        user_id = UUID(auth_context.id)
         updated_box.changed_by = user_id
         await self._box_dao.update(updated_box)
 
@@ -325,17 +332,29 @@ class UploadOrchestrator(UploadOrchestratorPort):
             )
 
     async def get_research_data_upload_box(
-        self, *, box_id: UUID4, user_id: UUID4
+        self, *, box_id: UUID4, auth_context: AuthContext
     ) -> ResearchDataUploadBox:
-        """Retrieve a Research Data Upload Box by ID
+        """Retrieve a Research Data Upload Box by ID.
+
+        For regular users, the access api will be queried. For Data Stewards, this check
+        is skipped.
 
         Raises:
             BoxAccessError: If the user doesn't have access to the box
             BoxNotFoundError: If the box doesn't exist
+            AccessAPIError: If there's a problem querying the access api
         """
         # Check that the user has access to this box (if nonexistent, show unauthorized)
-        has_access = await self._access_client.check_box_access(
-            box_id=box_id, user_id=user_id
+        is_ds = is_data_steward(auth_context)
+        user_id = UUID(auth_context.id)
+        has_access = (
+            True
+            if is_ds
+            else (
+                await self._access_client.check_box_access(
+                    box_id=box_id, user_id=user_id
+                )
+            )
         )
 
         if not has_access:

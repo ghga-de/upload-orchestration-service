@@ -165,13 +165,17 @@ class UploadOrchestratorPort(ABC):
 
     @abstractmethod
     async def get_research_data_upload_box(
-        self, *, box_id: UUID4, user_id: UUID4
+        self, *, box_id: UUID4, auth_context: AuthContext
     ) -> ResearchDataUploadBox:
-        """Retrieve a Research Data Upload Box by ID
+        """Retrieve a Research Data Upload Box by ID.
+
+        For regular users, the access api will be queried. For Data Stewards, this check
+        is skipped.
 
         Raises:
             BoxAccessError: If the user doesn't have access to the box
             BoxNotFoundError: If the box doesn't exist
+            AccessAPIError: If there's a problem querying the access api
         """
         ...
 

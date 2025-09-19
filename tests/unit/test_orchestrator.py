@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
+from ghga_service_commons.auth.context import AuthContext
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
@@ -34,15 +35,20 @@ pytestmark = pytest.mark.asyncio()
 
 TEST_FILE_UPLOAD_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
+TEST_OTHER_ID = UUID("43f83c2e-eccb-4ce3-bc97-cf1797b75225")
 
 # Auth context constants for testing
-DATA_STEWARD_AUTH_CONTEXT = Mock()
+DATA_STEWARD_AUTH_CONTEXT = Mock(spec=AuthContext)
 DATA_STEWARD_AUTH_CONTEXT.id = str(TEST_DS_ID)
 DATA_STEWARD_AUTH_CONTEXT.roles = ["data_steward"]
 
-REGULAR_USER_AUTH_CONTEXT = Mock()
+REGULAR_USER_AUTH_CONTEXT = Mock(spec=AuthContext)
 REGULAR_USER_AUTH_CONTEXT.id = str(TEST_DS_ID)
 REGULAR_USER_AUTH_CONTEXT.roles = []
+
+OTHER_USER_AUTH_CONTEXT = Mock(spec=AuthContext)
+OTHER_USER_AUTH_CONTEXT.id = str(TEST_OTHER_ID)
+OTHER_USER_AUTH_CONTEXT.roles = []
 
 
 @dataclass
@@ -135,8 +141,8 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
     assert updated_box.changed_by == TEST_DS_ID
     assert updated_box.last_changed - now_utc_ms_prec() < timedelta(seconds=5)
 
-    # Verify access client was called to check access
-    rig.access_client.check_box_access.assert_called_once()  # type: ignore
+    # Verify access client was not used because user is a Data Steward
+    rig.access_client.check_box_access.assert_not_called()  # type: ignore
 
 
 async def test_update_research_data_upload_box_not_found(rig: JointRig):
@@ -312,11 +318,10 @@ async def test_get_research_data_upload_box_happy(rig: JointRig):
         user_id=TEST_DS_ID,
     )
 
-    # Test case where user has access
+    # Try retrieval with Data Steward credentials
     rig.access_client.check_box_access.return_value = True  # type: ignore
-
     result = await rig.controller.get_research_data_upload_box(
-        box_id=box_id, user_id=TEST_DS_ID
+        box_id=box_id, auth_context=DATA_STEWARD_AUTH_CONTEXT
     )
 
     # Verify we got the correct box back
@@ -327,7 +332,14 @@ async def test_get_research_data_upload_box_happy(rig: JointRig):
     assert result.changed_by == TEST_DS_ID
     assert result.file_upload_box_id == TEST_FILE_UPLOAD_BOX_ID
 
-    # Verify access check was called
+    # Verify access check was NOT called for Data Steward
+    rig.access_client.check_box_access.assert_not_called()  # type: ignore
+
+    # Try with regular user
+    rig.access_client.check_box_access.return_value = True  # type: ignore
+    result = await rig.controller.get_research_data_upload_box(
+        box_id=box_id, auth_context=REGULAR_USER_AUTH_CONTEXT
+    )
     rig.access_client.check_box_access.assert_called_once()  # type: ignore
 
 
@@ -344,13 +356,11 @@ async def test_get_research_data_upload_box_access_denied(rig: JointRig):
     # Mock the access client to return that the user does NOT have access
     rig.access_client.check_box_access.return_value = False  # type: ignore
 
-    # Try to get the box with a different user ID
-    different_user_id = uuid4()
-
+    # Try to get the box with a different user
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_research_data_upload_box(
-            box_id=box_id, user_id=different_user_id
+            box_id=box_id, auth_context=OTHER_USER_AUTH_CONTEXT
         )
 
     # Verify access check was called
@@ -368,7 +378,7 @@ async def test_get_research_data_upload_box_not_found(rig: JointRig):
     # This should raise BoxNotFoundError since the box doesn't exist
     with pytest.raises(rig.controller.BoxNotFoundError):
         await rig.controller.get_research_data_upload_box(
-            box_id=non_existent_box_id, user_id=TEST_DS_ID
+            box_id=non_existent_box_id, auth_context=OTHER_USER_AUTH_CONTEXT
         )
 
     # Verify access check was called first

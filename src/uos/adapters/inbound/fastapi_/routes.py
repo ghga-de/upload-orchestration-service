@@ -131,12 +131,12 @@ async def get_research_data_upload_box(
     existing box, this endpoint will return a 404.
     """
     try:
-        user_id = UUID(auth_context.id)
         box = await upload_service.get_research_data_upload_box(
-            box_id=box_id, user_id=user_id
+            box_id=box_id, auth_context=auth_context
         )
         return box
     except UploadOrchestratorPort.BoxAccessError as err:
+        # Return BoxAccessError as a 404 on purpose
         raise HttpBoxNotFoundError(box_id=box_id) from err
     except UploadOrchestratorPort.BoxNotFoundError as err:
         raise HttpBoxNotFoundError(box_id=box_id) from err

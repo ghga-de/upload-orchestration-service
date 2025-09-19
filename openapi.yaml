@@ -444,6 +444,18 @@ paths:
           - type: 'null'
           description: Maximum number of research data upload boxes to return
           title: Limit
+      - description: Filter by locked status. None returns both locked and unlocked
+          boxes.
+        in: query
+        name: locked
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          description: Filter by locked status. None returns both locked and unlocked
+            boxes.
+          title: Locked
       responses:
         '200':
           content:
