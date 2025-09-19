@@ -130,8 +130,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
         updated_box = box.model_copy(update=changed_fields)
 
         # If not a data steward, the only acceptable update is to move from OPEN to LOCKED
-        is_data_steward = "data_steward" in auth_context.roles
-        if not is_data_steward and not (
+        is_ds = is_data_steward(auth_context)
+        if not is_ds and not (
             changed_fields == {"state": "locked"}
             and box.state == ResearchDataUploadBoxState.OPEN
         ):
@@ -282,10 +282,10 @@ class UploadOrchestrator(UploadOrchestratorPort):
         except ResourceNotFoundError as err:
             raise self.BoxNotFoundError(box_id=box_id) from err
 
-        is_data_steward = "data_steward" in auth_context.roles
+        is_ds = is_data_steward(auth_context)
         user_id = UUID(auth_context.id)
 
-        if not is_data_steward:
+        if not is_ds:
             # Check if user has access to this box
             accessible_boxes = await self._access_client.get_accessible_upload_boxes(
                 user_id
@@ -390,12 +390,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """
         # Check if user is a data steward
-        is_data_steward = "data_steward" in (auth_context.roles or [])
+        is_ds = is_data_steward(auth_context)
 
         # Filter by locked status if specified
         mapping = {"locked": locked} if locked is not None else {}
 
-        if is_data_steward:
+        if is_ds:
             # Data stewards can see all boxes
             boxes = [x async for x in self._box_dao.find_all(mapping=mapping)]
         else:
