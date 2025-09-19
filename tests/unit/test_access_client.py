@@ -18,6 +18,7 @@
 from datetime import timedelta
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
@@ -159,9 +160,6 @@ async def test_check_box_access(config: ConfigFixture, httpx_mock: HTTPXMock):
     httpx_mock.add_response(422, json={"error": "Unprocessable entity"})
     with pytest.raises(AccessClient.AccessAPIError):
         await access_client.check_box_access(user_id=TEST_USER_ID, box_id=TEST_BOX_ID)
-
-    # Check network error (timeout, connection error, etc.)
-    import httpx
 
     httpx_mock.add_exception(httpx.RequestError("Network error"))
     with pytest.raises(AccessClient.AccessAPIError):
