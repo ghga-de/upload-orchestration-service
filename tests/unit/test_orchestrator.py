@@ -65,12 +65,17 @@ class JointRig:
     controller: UploadOrchestrator
 
 
+async def file_upload_box_id_generator(*args, **kwargs) -> UUID:
+    """Return a new FileUploadBox ID"""
+    return uuid4()
+
+
 @pytest.fixture()
 def rig(config: ConfigFixture) -> JointRig:
     """Return a joint fixture with in-memory dependency mocks"""
     _config = config.config
     file_box_client_mock = AsyncMock()
-    file_box_client_mock.create_file_upload_box.return_value = TEST_FILE_UPLOAD_BOX_ID
+    file_box_client_mock.create_file_upload_box = file_upload_box_id_generator
     access_client_mock = AsyncMock()
 
     controller = UploadOrchestrator(
@@ -99,9 +104,9 @@ async def populate_boxes(rig: JointRig):
             title=f"Box {chr(65 + i)}",  # "Box A", "Box B", etc.
             description=f"Description {i}",
             storage_alias="HD01",
-            data_steward_id=TEST_USER_ID1,
+            data_steward_id=TEST_DS_ID,
         )
-        await sleep(0.001)
+        await sleep(0.001)  # insert pause to ensure different timestamps for sortings
         box_ids.append(box_id)
     return box_ids
 
@@ -123,22 +128,16 @@ async def test_create_research_data_upload_box(rig: JointRig):
     assert box.changed_by == TEST_DS_ID
     assert box.file_count == 0
     assert box.size == 0
-    assert box.file_upload_box_id == TEST_FILE_UPLOAD_BOX_ID
+    assert isinstance(box.file_upload_box_id, UUID)
     assert box.last_changed - now_utc_ms_prec() < timedelta(seconds=5)
     assert box.locked == False
     assert box.state == "open"
 
 
-async def test_update_research_data_upload_box_happy(rig: JointRig):
+async def test_update_research_data_upload_box_happy(
+    rig: JointRig, populated_boxes: list[UUID]
+):
     """Test the normal path of updating box attributes."""
-    # First create a box to update
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Original Title",
-        description="Original Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Mock the access client to return that the user has access
     rig.access_client.check_box_access.return_value = True  # type: ignore
 
@@ -148,6 +147,7 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
     )
 
     # Call the update method
+    box_id = populated_boxes[0]
     await rig.controller.update_research_data_upload_box(
         box_id=box_id, request=update_request, auth_context=DATA_STEWARD_AUTH_CONTEXT
     )
@@ -163,7 +163,9 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
     rig.access_client.check_box_access.assert_not_called()  # type: ignore
 
 
-async def test_update_research_data_upload_box_unauthorized(rig: JointRig):
+async def test_update_research_data_upload_box_unauthorized(
+    rig: JointRig, populated_boxes: list[UUID]
+):
     """Test the scenario where a user tries updating box attributes like title or description.
 
     Regular users are not authorized to do this, so this should be blocked.
@@ -171,20 +173,13 @@ async def test_update_research_data_upload_box_unauthorized(rig: JointRig):
     # Mock the access client to return that the user has access (but box doesn't exist)
     rig.access_client.check_box_access.return_value = True  # type: ignore
 
-    # First create a box to update
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Original Title",
-        description="Original Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Create an update request
     update_request = models.UpdateUploadBoxRequest(
         title="Updated Title", description="Updated Description"
     )
 
     # Call the update method
+    box_id = populated_boxes[0]
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
@@ -215,22 +210,14 @@ async def test_update_research_data_upload_box_not_found(rig: JointRig):
         )
 
 
-# TODO: Apply the fixture to most of these tests
-async def test_get_upload_box_files_happy(rig: JointRig):
+async def test_get_upload_box_files_happy(rig: JointRig, populated_boxes: list[UUID]):
     """Test the normal path of getting a list of file IDs for a box from the file box service."""
-    # First create a box
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Test Box",
-        description="Test Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Mock the file box client to return a list of file IDs
     test_file_ids = sorted([uuid4(), uuid4(), uuid4()])
     rig.file_upload_box_client.get_file_upload_list.return_value = test_file_ids  # type: ignore
 
     # Mock the access client for non-data steward case
+    box_id = populated_boxes[0]
     rig.access_client.check_box_access.return_value = [box_id]  # type: ignore
 
     # Call the method
@@ -248,23 +235,17 @@ async def test_get_upload_box_files_happy(rig: JointRig):
     rig.access_client.check_box_access.assert_called_once()  # type: ignore
 
 
-async def test_get_upload_box_files_access_error(rig: JointRig):
+async def test_get_upload_box_files_access_error(
+    rig: JointRig, populated_boxes: list[UUID]
+):
     """Test the case where getting box files fails because the user doesn't have access."""
-    # First create a box
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Test Box",
-        description="Test Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Mock the access client to return that the user does NOT have access to this box
     rig.access_client.check_box_access.return_value = False  # type: ignore
 
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_upload_box_files(
-            box_id=box_id, auth_context=USER2_AUTH_CONTEXT
+            box_id=populated_boxes[0], auth_context=USER2_AUTH_CONTEXT
         )
 
     # Verify that access check was performed
@@ -293,25 +274,19 @@ async def test_get_upload_box_files_box_not_found(rig: JointRig):
     rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
 
 
-async def test_upsert_file_upload_box_happy(rig: JointRig):
+async def test_upsert_file_upload_box_happy(rig: JointRig, populated_boxes: list[UUID]):
     """Test the method that consumes FileUploadBox data and uses it to update RDUBoxes."""
-    # First create a research data upload box
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Test Box",
-        description="Test Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Get the created box to verify initial state
+    box_id = populated_boxes[0]
     initial_box = await rig.box_dao.get_by_id(box_id)
     assert initial_box.file_count == 0
     assert initial_box.size == 0
     assert initial_box.locked == False
+    file_upload_box_id = initial_box.file_upload_box_id
 
     # Create a FileUploadBox with updated data
     updated_file_upload_box = models.FileUploadBox(
-        id=TEST_FILE_UPLOAD_BOX_ID,  # This should match the file_upload_box_id in our research box
+        id=file_upload_box_id,  # This should match the file_upload_box_id in our research box
         locked=True,
         file_count=5,
         size=1024000,
@@ -328,8 +303,8 @@ async def test_upsert_file_upload_box_happy(rig: JointRig):
     assert updated_box.locked == True
 
     # Verify other fields remain unchanged
-    assert updated_box.title == "Test Box"
-    assert updated_box.description == "Test Description"
+    assert updated_box.title == "Box A"
+    assert updated_box.description == "Description 0"
     assert updated_box.storage_alias == "HD01"
 
 
@@ -351,29 +326,23 @@ async def test_upsert_file_upload_box_not_found(rig: JointRig):
     assert not [x async for x in rig.box_dao.find_all(mapping={})]
 
 
-async def test_get_research_data_upload_box_happy(rig: JointRig):
+async def test_get_research_data_upload_box_happy(
+    rig: JointRig, populated_boxes: list[UUID]
+):
     """Test the normal path of getting a research data upload box."""
-    # First create a research data upload box
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Test Box",
-        description="Test Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Try retrieval with Data Steward credentials
     rig.access_client.check_box_access.return_value = True  # type: ignore
+    box_id = populated_boxes[0]
     result = await rig.controller.get_research_data_upload_box(
         box_id=box_id, auth_context=DATA_STEWARD_AUTH_CONTEXT
     )
 
     # Verify we got the correct box back
     assert result.id == box_id
-    assert result.title == "Test Box"
-    assert result.description == "Test Description"
+    assert result.title == "Box A"
+    assert result.description == "Description 0"
     assert result.storage_alias == "HD01"
     assert result.changed_by == TEST_DS_ID
-    assert result.file_upload_box_id == TEST_FILE_UPLOAD_BOX_ID
 
     # Verify access check was NOT called for Data Steward
     rig.access_client.check_box_access.assert_not_called()  # type: ignore
@@ -386,16 +355,10 @@ async def test_get_research_data_upload_box_happy(rig: JointRig):
     rig.access_client.check_box_access.assert_called_once()  # type: ignore
 
 
-async def test_get_research_data_upload_box_access_denied(rig: JointRig):
+async def test_get_research_data_upload_box_access_denied(
+    rig: JointRig, populated_boxes: list[UUID]
+):
     """Test the case where the user doesn't have access to the box."""
-    # First create a research data upload box
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Test Box",
-        description="Test Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Mock the access client to return that the user does NOT have access
     rig.access_client.check_box_access.return_value = False  # type: ignore
 
@@ -403,7 +366,7 @@ async def test_get_research_data_upload_box_access_denied(rig: JointRig):
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_research_data_upload_box(
-            box_id=box_id, auth_context=USER2_AUTH_CONTEXT
+            box_id=populated_boxes[0], auth_context=USER2_AUTH_CONTEXT
         )
 
     # Verify access check was called
@@ -428,25 +391,20 @@ async def test_get_research_data_upload_box_not_found(rig: JointRig):
     rig.access_client.check_box_access.assert_called_once()  # type: ignore
 
 
-async def test_get_upload_access_grants_happy(rig: JointRig):
+async def test_get_upload_access_grants_happy(
+    rig: JointRig, populated_boxes: list[UUID]
+):
     """Test the normal path for getting upload access grants."""
     # First create a research data upload box
-    box_id = await rig.controller.create_research_data_upload_box(
-        title="Test Box",
-        description="Test Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
+    box_id = populated_boxes[0]
     # Create mock upload grants that would be returned by access client
-    test_user_id = uuid4()
     test_iva_id = uuid4()
     test_grant_id = uuid4()
 
     mock_grants = [
         models.UploadGrant(
             id=test_grant_id,
-            user_id=test_user_id,
+            user_id=TEST_USER_ID1,
             iva_id=test_iva_id,
             box_id=box_id,
             created=now_utc_ms_prec(),
@@ -463,7 +421,7 @@ async def test_get_upload_access_grants_happy(rig: JointRig):
 
     # Call the method
     result = await rig.controller.get_upload_access_grants(
-        user_id=test_user_id,
+        user_id=TEST_USER_ID1,
         iva_id=test_iva_id,
         box_id=box_id,
         valid=True,
@@ -473,46 +431,40 @@ async def test_get_upload_access_grants_happy(rig: JointRig):
     assert len(result) == 1
     grant_with_info = result[0]
     assert grant_with_info.id == test_grant_id
-    assert grant_with_info.user_id == test_user_id
+    assert grant_with_info.user_id == TEST_USER_ID1
     assert grant_with_info.iva_id == test_iva_id
     assert grant_with_info.box_id == box_id
     assert grant_with_info.user_name == "Test User"
     assert grant_with_info.user_email == "test@example.com"
     assert grant_with_info.user_title == "Dr."
     # These should come from the box
-    assert grant_with_info.box_title == "Test Box"
-    assert grant_with_info.box_description == "Test Description"
+    assert grant_with_info.box_title == "Box A"
+    assert grant_with_info.box_description == "Description 0"
 
     # Verify access client was called with correct parameters
     rig.access_client.get_upload_access_grants.assert_called_once_with(  # type: ignore
-        user_id=test_user_id,
+        user_id=TEST_USER_ID1,
         iva_id=test_iva_id,
         box_id=box_id,
         valid=True,
     )
 
 
-async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
+async def test_get_upload_access_grants_box_missing(
+    rig: JointRig, caplog, populated_boxes: list[UUID]
+):
     """Test the case where grants returned from the access API include a grant with
     a box ID that doesn't exist in the UOS. This test also checks that we emit a
     WARNING log (but don't raise an error).
     """
-    # Create one valid box
-    valid_box_id = await rig.controller.create_research_data_upload_box(
-        title="Valid Box",
-        description="Valid Description",
-        storage_alias="HD01",
-        data_steward_id=TEST_DS_ID,
-    )
-
     # Create mock upload grants - one with a valid box ID, one with an invalid box ID
-    test_user_id = uuid4()
+    valid_box_id = populated_boxes[0]
     invalid_box_id = uuid4()  # This box doesn't/won't exist
 
     mock_grants = [
         models.UploadGrant(
             id=uuid4(),
-            user_id=test_user_id,
+            user_id=TEST_USER_ID1,
             iva_id=uuid4(),
             box_id=valid_box_id,  # This box exists
             created=now_utc_ms_prec(),
@@ -524,7 +476,7 @@ async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
         ),
         models.UploadGrant(
             id=uuid4(),
-            user_id=test_user_id,
+            user_id=TEST_USER_ID1,
             iva_id=uuid4(),
             box_id=invalid_box_id,  # This box doesn't exist
             created=now_utc_ms_prec(),
@@ -546,8 +498,8 @@ async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
     assert len(result) == 1
     grant_with_info = result[0]
     assert grant_with_info.box_id == valid_box_id
-    assert grant_with_info.box_title == "Valid Box"
-    assert grant_with_info.box_description == "Valid Description"
+    assert grant_with_info.box_title == "Box A"
+    assert grant_with_info.box_description == "Description 0"
 
     # Verify a warning was logged for the invalid box
     assert caplog.records
