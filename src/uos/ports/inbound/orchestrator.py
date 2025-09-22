@@ -194,7 +194,8 @@ class UploadOrchestratorPort(ABC):
         For data stewards, returns all boxes. For regular users, only returns boxes
         they have access to according to the Access API.
 
-        Results are sorted alphabetically by title.
+        Results are sorted first by locked status (unlocked first), then by most
+        recently changed, and then by box ID.
 
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """

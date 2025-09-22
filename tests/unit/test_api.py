@@ -615,7 +615,6 @@ async def test_get_boxes(
         {"skip": "abc"},
         {"limit": -1},
         {"limit": "abc"},
-        {"skip": 10, "limit": 5},
     ],
 )
 async def test_get_boxes_bad_parameters(config: ConfigFixture, ds_auth_headers, params):

@@ -417,7 +417,9 @@ paths:
   /boxes:
     get:
       description: Returns a list of research data upload boxes. Results are sorted
-        alphabetically by title.
+        first by locked status (unlocked followed by locked), then by most recently
+        changed, then by box ID. Data Stewards have access to all boxes, while regular
+        users may only access boxes to which they have been granted upload access.
       operationId: get_research_data_upload_boxes_boxes_get
       parameters:
       - description: Number of research data upload boxes to skip for pagination

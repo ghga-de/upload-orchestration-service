@@ -15,12 +15,14 @@
 
 """Unit tests for the main core class"""
 
+from asyncio import sleep
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
 
 import pytest
+import pytest_asyncio
 from ghga_service_commons.auth.context import AuthContext
 from hexkit.utils import now_utc_ms_prec
 
@@ -35,20 +37,21 @@ pytestmark = pytest.mark.asyncio()
 
 TEST_FILE_UPLOAD_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
-TEST_OTHER_ID = UUID("43f83c2e-eccb-4ce3-bc97-cf1797b75225")
+TEST_USER_ID1 = UUID("0ef5e39b-3ff2-4685-99e8-5aaf04942c45")
+TEST_USER_ID2 = UUID("43f83c2e-eccb-4ce3-bc97-cf1797b75225")
 
 # Auth context constants for testing
 DATA_STEWARD_AUTH_CONTEXT = Mock(spec=AuthContext)
 DATA_STEWARD_AUTH_CONTEXT.id = str(TEST_DS_ID)
 DATA_STEWARD_AUTH_CONTEXT.roles = ["data_steward"]
 
-REGULAR_USER_AUTH_CONTEXT = Mock(spec=AuthContext)
-REGULAR_USER_AUTH_CONTEXT.id = str(TEST_DS_ID)
-REGULAR_USER_AUTH_CONTEXT.roles = []
+USER1_AUTH_CONTEXT = Mock(spec=AuthContext)
+USER1_AUTH_CONTEXT.id = str(TEST_USER_ID1)
+USER1_AUTH_CONTEXT.roles = []
 
-OTHER_USER_AUTH_CONTEXT = Mock(spec=AuthContext)
-OTHER_USER_AUTH_CONTEXT.id = str(TEST_OTHER_ID)
-OTHER_USER_AUTH_CONTEXT.roles = []
+USER2_AUTH_CONTEXT = Mock(spec=AuthContext)
+USER2_AUTH_CONTEXT.id = str(TEST_USER_ID2)
+USER2_AUTH_CONTEXT.roles = []
 
 
 @dataclass
@@ -84,6 +87,23 @@ def rig(config: ConfigFixture) -> JointRig:
         access_client=access_client_mock,
         controller=controller,
     )
+
+
+@pytest_asyncio.fixture(name="populated_boxes")
+async def populate_boxes(rig: JointRig):
+    """Populate 5 test boxes in the JointRig's mock DAO"""
+    # Create multiple boxes for testing
+    box_ids: list[UUID] = []
+    for i in range(5):
+        box_id = await rig.controller.create_research_data_upload_box(
+            title=f"Box {chr(65 + i)}",  # "Box A", "Box B", etc.
+            description=f"Description {i}",
+            storage_alias="HD01",
+            data_steward_id=TEST_USER_ID1,
+        )
+        await sleep(0.001)
+        box_ids.append(box_id)
+    return box_ids
 
 
 async def test_create_research_data_upload_box(rig: JointRig):
@@ -169,7 +189,7 @@ async def test_update_research_data_upload_box_unauthorized(rig: JointRig):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
-            auth_context=REGULAR_USER_AUTH_CONTEXT,
+            auth_context=USER1_AUTH_CONTEXT,
         )
 
 
@@ -195,6 +215,7 @@ async def test_update_research_data_upload_box_not_found(rig: JointRig):
         )
 
 
+# TODO: Apply the fixture to most of these tests
 async def test_get_upload_box_files_happy(rig: JointRig):
     """Test the normal path of getting a list of file IDs for a box from the file box service."""
     # First create a box
@@ -214,7 +235,7 @@ async def test_get_upload_box_files_happy(rig: JointRig):
 
     # Call the method
     result = await rig.controller.get_upload_box_files(
-        box_id=box_id, auth_context=REGULAR_USER_AUTH_CONTEXT
+        box_id=box_id, auth_context=USER1_AUTH_CONTEXT
     )
 
     # Verify the results
@@ -243,7 +264,7 @@ async def test_get_upload_box_files_access_error(rig: JointRig):
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_upload_box_files(
-            box_id=box_id, auth_context=OTHER_USER_AUTH_CONTEXT
+            box_id=box_id, auth_context=USER2_AUTH_CONTEXT
         )
 
     # Verify that access check was performed
@@ -360,7 +381,7 @@ async def test_get_research_data_upload_box_happy(rig: JointRig):
     # Try with regular user
     rig.access_client.check_box_access.return_value = True  # type: ignore
     result = await rig.controller.get_research_data_upload_box(
-        box_id=box_id, auth_context=REGULAR_USER_AUTH_CONTEXT
+        box_id=box_id, auth_context=USER1_AUTH_CONTEXT
     )
     rig.access_client.check_box_access.assert_called_once()  # type: ignore
 
@@ -382,7 +403,7 @@ async def test_get_research_data_upload_box_access_denied(rig: JointRig):
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_research_data_upload_box(
-            box_id=box_id, auth_context=OTHER_USER_AUTH_CONTEXT
+            box_id=box_id, auth_context=USER2_AUTH_CONTEXT
         )
 
     # Verify access check was called
@@ -400,7 +421,7 @@ async def test_get_research_data_upload_box_not_found(rig: JointRig):
     # This should raise BoxNotFoundError since the box doesn't exist
     with pytest.raises(rig.controller.BoxNotFoundError):
         await rig.controller.get_research_data_upload_box(
-            box_id=non_existent_box_id, auth_context=OTHER_USER_AUTH_CONTEXT
+            box_id=non_existent_box_id, auth_context=USER2_AUTH_CONTEXT
         )
 
     # Verify access check was called first
@@ -541,120 +562,121 @@ async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
     rig.access_client.get_upload_access_grants.assert_called_once()  # type: ignore
 
 
-async def test_get_boxes(rig: JointRig):
-    """Test the get_research_data_upload_boxes method in the orchestrator."""
-    # Create multiple boxes for testing
-    box_ids = []
-    for i in range(5):
-        box_id = await rig.controller.create_research_data_upload_box(
-            title=f"Box {chr(65 + i)}",  # "Box A", "Box B", etc.
-            description=f"Description {i}",
-            storage_alias="HD01",
-            user_id=TEST_DS_ID,
-        )
-        box_ids.append(box_id)
-
-    # Data steward can see all boxes
+async def test_get_boxes_data_steward(rig: JointRig, populated_boxes: list[UUID]):
+    """Test the get_research_data_upload_boxes method for data stewards."""
     results = await rig.controller.get_research_data_upload_boxes(
         auth_context=DATA_STEWARD_AUTH_CONTEXT
     )
     assert results.count == 5
     assert len(results.boxes) == 5
 
-    # Verify sorting by title (alphabetical, ascending by default)
-    assert results.boxes[0].title == "Box A"
-    assert results.boxes[4].title == "Box E"
 
-    # Verify pagination works for data stewards
+async def test_get_boxes_regular_user(rig: JointRig, populated_boxes: list[UUID]):
+    """Test the get_research_data_upload_boxes method for users."""
+    # Assert that, before being given access, the user gets an empty list
+    rig.access_client.get_accessible_upload_boxes.return_value = []  # type: ignore
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=USER1_AUTH_CONTEXT
+    )
+    assert results.count == 0
+    assert results.boxes == []
+
+    # Give User1 access boxes 1-3 and check results
+    rig.access_client.get_accessible_upload_boxes.return_value = populated_boxes[:3]  # type: ignore
+
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=USER1_AUTH_CONTEXT
+    )
+    assert results.count == 3
+    result_ids = [box.id for box in results.boxes]
+    assert len(result_ids) == 3
+    assert result_ids == list(reversed(populated_boxes[:3]))
+
+    # Try retrieving boxes when there's no access
+    rig.access_client.get_accessible_upload_boxes.return_value = []  # type: ignore
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=USER1_AUTH_CONTEXT
+    )
+    assert results.count == 0
+    assert results.boxes == []
+
+
+async def test_get_boxes_sorting(rig: JointRig, populated_boxes: list[UUID]):
+    """Test the sorting within the get_research_data_upload_boxes method.
+
+    Boxes are sorted first by unlocked, then locked boxes, and further sorted by
+    most recently changed and finally by box ID (ascending).
+    """
+    # Update two boxes to have the locked flag set
+    locked_box_ids = [populated_boxes[1], populated_boxes[3]]
+    for box_id in locked_box_ids:
+        await sleep(0.001)
+        await rig.controller.update_research_data_upload_box(
+            box_id=box_id,
+            request=models.UpdateUploadBoxRequest(state="locked"),  # type: ignore
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
+        )
+
+    results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT
+    )
+    assert results.count == 5
+    results_ids = [box.id for box in results.boxes]
+    assert results_ids == [
+        populated_boxes[4],  # Last created, unlocked
+        populated_boxes[2],  # Unlocked
+        populated_boxes[0],  # Unlocked, created first
+        populated_boxes[3],  # Locked, updated most recently
+        populated_boxes[1],  # Locked
+    ]
+
+    # Filter by locked
+    locked_results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=True
+    )
+    assert locked_results.count == 2
+    locked_results_ids = [box.id for box in locked_results.boxes]
+    assert locked_results_ids == [populated_boxes[3], populated_boxes[1]]
+
+    # Filter by unlocked
+    unlocked_results = await rig.controller.get_research_data_upload_boxes(
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=False
+    )
+    assert unlocked_results.count == 3
+    unlocked_results_ids = [box.id for box in unlocked_results.boxes]
+    assert unlocked_results_ids == [
+        populated_boxes[4],
+        populated_boxes[2],
+        populated_boxes[0],
+    ]
+
+
+async def test_get_boxes_pagination(rig: JointRig, populated_boxes: list[UUID]):
+    """Test pagination of the get_research_data_upload_boxes method."""
+    # Verify pagination works
     results = await rig.controller.get_research_data_upload_boxes(
         auth_context=DATA_STEWARD_AUTH_CONTEXT, skip=2, limit=2
     )
     assert results.count == 5  # Total count is still 5
     assert len(results.boxes) == 2  # But we only get 2 items
-    assert results.boxes[0].title == "Box C"
-    assert results.boxes[1].title == "Box D"
-
-    # Verify that non-data stewards see only accessible boxes
-    regular_user_id = uuid4()
-    regular_user_auth_context = Mock()
-    regular_user_auth_context.id = str(regular_user_id)
-    regular_user_auth_context.roles = ["regular_user"]
-
-    # Mock access client to return only some boxes as accessible
-    accessible_boxes = [box_ids[1], box_ids[3]]  # Box B and Box D
-    rig.access_client.get_accessible_upload_boxes.return_value = accessible_boxes  # type: ignore
+    results_ids = [box.id for box in results.boxes]
+    assert results_ids == [populated_boxes[2], populated_boxes[1]]  # sorted results
 
     results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=regular_user_auth_context
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, skip=6, limit=None
     )
-    assert results.count == 2
-    assert len(results.boxes) == 2
-    assert results.boxes[0].title == "Box B"
-    assert results.boxes[1].title == "Box D"
-
-    # Verify the access client was called with the correct user ID
-    rig.access_client.get_accessible_upload_boxes.assert_called_once_with(  # type: ignore
-        user_id=regular_user_id
-    )
-
-    # Regular user with no accessible boxes
-    rig.access_client.get_accessible_upload_boxes.reset_mock()  # type: ignore
-    rig.access_client.get_accessible_upload_boxes.return_value = []  # type: ignore
+    assert results.count == 5
+    assert results.boxes == []
 
     results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=regular_user_auth_context
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, skip=6, limit=1
     )
-    assert results.count == 0
-    assert len(results.boxes) == 0
+    assert results.count == 5
+    assert results.boxes == []
 
-    # Verify pagination works for non-data stewards
-    rig.access_client.get_accessible_upload_boxes.reset_mock()  # type: ignore
-
-    # User has access to 3 boxes
-    accessible_boxes = [box_ids[0], box_ids[2], box_ids[4]]  # Box A, Box C, Box E
-    rig.access_client.get_accessible_upload_boxes.return_value = accessible_boxes  # type: ignore
-
+    # The following won't happen in the real world because all requests go through API
     results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=regular_user_auth_context, skip=1, limit=1
-    )
-    assert results.count == 3  # User can access 3 boxes total
-    assert len(results.boxes) == 1  # But we only get 1 item due to pagination
-    assert results.boxes[0].title == "Box C"
-
-    # Test locked filter functionality
-    # First, lock some boxes by updating their locked status
-    all_boxes = [x async for x in rig.box_dao.find_all(mapping={})]
-
-    # Lock the first two boxes (Box A and Box B)
-    locked_boxes = all_boxes[:2]
-    for box in locked_boxes:
-        updated_box = box.model_copy(update={"locked": True})
-        await rig.box_dao.update(updated_box)
-
-    # Test filtering for locked boxes only (as data steward)
-    results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=True
-    )
-    assert results.count == 2
-    assert len(results.boxes) == 2
-    assert all(box.locked for box in results.boxes)
-    assert results.boxes[0].title == "Box A"
-    assert results.boxes[1].title == "Box B"
-
-    # Test filtering for unlocked boxes only (as data steward)
-    results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=False
-    )
-    assert results.count == 3
-    assert len(results.boxes) == 3
-    assert all(not box.locked for box in results.boxes)
-    assert results.boxes[0].title == "Box C"
-    assert results.boxes[1].title == "Box D"
-    assert results.boxes[2].title == "Box E"
-
-    # Test no filter (None) returns all boxes (as data steward)
-    results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=None
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, skip=-1, limit=-1
     )
     assert results.count == 5
     assert len(results.boxes) == 5

@@ -372,10 +372,19 @@ class UploadOrchestrator(UploadOrchestratorPort):
         For data stewards, returns all boxes. For regular users, only returns boxes
         they have access to according to the Access API.
 
-        Results are sorted alphabetically by title.
+        Results are sorted first by locked status (unlocked first), then by most
+        recently changed, and then by box ID.
 
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """
+        if skip is not None and skip < 0:
+            skip = None
+            log.warning("Received invalid arg %i for skip parameter, setting to 0")
+
+        if limit is not None and limit < 0:
+            limit = None
+            log.warning("Received invalid arg %i for limit parameter, setting to None")
+
         # Check if user is a data steward
         is_ds = is_data_steward(auth_context)
 
@@ -400,7 +409,13 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 boxes = [x for x in boxes if x.locked == locked]
 
         count = len(boxes)
-        boxes.sort(key=lambda x: x.title)
+        boxes.sort(
+            key=lambda x: (
+                x.locked,  # sort so unlocked are first, locked last (False < True)
+                -x.last_changed.timestamp(),  # DESC by last_changed
+                x.id,  # ASC by ID
+            )
+        )
 
         if skip:
             boxes = boxes[skip:]

@@ -30,7 +30,6 @@ from uos.adapters.inbound.fastapi_.http_exceptions import (
     HttpGrantNotFoundError,
     HttpInternalError,
     HttpNotAuthorizedError,
-    HttpPaginationError,
 )
 from uos.constants import TRACER
 from uos.core.models import (
@@ -65,7 +64,12 @@ async def health():
 @router.get(
     "/boxes",
     summary="List upload boxes",
-    description="Returns a list of research data upload boxes. Results are sorted alphabetically by title.",
+    description=(
+        "Returns a list of research data upload boxes. Results are sorted first by"
+        + " locked status (unlocked followed by locked), then by most recently changed,"
+        + " then by box ID. Data Stewards have access to all boxes, while regular users"
+        + " may only access boxes to which they have been granted upload access."
+    ),
     tags=TAGS,
     response_model=BoxRetrievalResults,
     responses={
@@ -99,14 +103,11 @@ async def get_research_data_upload_boxes(
         ),
     ] = None,
 ) -> BoxRetrievalResults:
-    """Get list of all research data upload boxes with pagination support."""
-    if skip and limit and (skip >= limit):
-        raise HttpPaginationError(
-            message="Skip must be less than limit",
-            skip=skip,
-            limit=limit,
-        )
+    """Get list of all research data upload boxes with pagination support.
 
+    For data stewards, returns all boxes. For regular users, only returns boxes
+    they have access to according to.
+    """
     try:
         results = await upload_service.get_research_data_upload_boxes(
             auth_context=auth_context,
