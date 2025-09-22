@@ -183,8 +183,8 @@ class UpdateUploadBoxRequest(BaseModel):
 class GrantAccessRequest(BaseModel):
     """Request model for granting upload access to a user."""
 
-    valid_from: UTCDatetime = Field(default=..., description="Start date of validity")
-    valid_until: UTCDatetime = Field(default=..., description="End date of validity")
+    valid_from: UTCDatetime = Field(..., description="Start date of validity")
+    valid_until: UTCDatetime = Field(..., description="End date of validity")
     user_id: UUID4 = Field(..., description="ID of the user to grant access to")
     iva_id: UUID4 = Field(..., description="ID of the IVA verification")
     box_id: UUID4 = Field(..., description="ID of the upload box")
@@ -203,7 +203,7 @@ class UploadGrant(BaseModel):
     """An upload access grant."""
 
     id: UUID4 = Field(..., description="Internal grant ID (same as claim ID)")
-    user_id: UUID4 = Field(default=..., description="Internal user ID")
+    user_id: UUID4 = Field(..., description="Internal user ID")
     iva_id: UUID4 | None = Field(
         default=None, description="ID of an IVA associated with this grant"
     )
@@ -213,10 +213,10 @@ class UploadGrant(BaseModel):
     created: UTCDatetime = Field(
         default=..., description="Date of creation of this grant"
     )
-    valid_from: UTCDatetime = Field(default=..., description="Start date of validity")
-    valid_until: UTCDatetime = Field(default=..., description="End date of validity")
+    valid_from: UTCDatetime = Field(..., description="Start date of validity")
+    valid_until: UTCDatetime = Field(..., description="End date of validity")
 
-    user_name: str = Field(default=..., description="Full name of the user")
+    user_name: str = Field(..., description="Full name of the user")
     user_email: EmailStr = Field(
         default=...,
         description="The email address of the user",
