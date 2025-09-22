@@ -189,7 +189,10 @@ class AccessClient(AccessClientPort):
         """
         url = f"{self._access_url}/upload-access/users/{user_id}/boxes"
         response = httpx.get(url)
-        if response.status_code != 200:
+        status_code = response.status_code
+        if status_code == httpx.codes.NOT_FOUND:
+            return []
+        elif status_code != httpx.codes.OK:
             log.error(
                 "Failed to retrieve list of research data upload boxes accessible to"
                 + " user %s from the access API.",

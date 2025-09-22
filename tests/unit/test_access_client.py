@@ -90,10 +90,11 @@ async def test_get_accessible_upload_boxes(
     access_client = AccessClient(config=config.config)
 
     # Happy path with multiple boxes
-    box_list = [uuid4() for _ in range(3)]
-    httpx_mock.add_response(200, json=[str(box_id) for box_id in box_list])
+    some_datetime = now_utc_ms_prec().isoformat()
+    box_to_expiration: dict[UUID, str] = {uuid4(): some_datetime for _ in range(3)}
+    httpx_mock.add_response(200, json=[str(box_id) for box_id in box_to_expiration])
     result = await access_client.get_accessible_upload_boxes(user_id=TEST_USER_ID)
-    assert result == box_list
+    assert result == list(box_to_expiration.keys())
 
     # Happy path with empty list
     httpx_mock.add_response(200, json=[])
@@ -112,8 +113,8 @@ async def test_get_accessible_upload_boxes(
 
     # Check 404 status code
     httpx_mock.add_response(404, json={"error": "Not found"})
-    with pytest.raises(AccessClient.AccessAPIError):
-        await access_client.get_accessible_upload_boxes(user_id=TEST_USER_ID)
+    result = await access_client.get_accessible_upload_boxes(user_id=TEST_USER_ID)
+    assert result == []
 
     # Check with successful status code but garbled response body (not a list)
     httpx_mock.add_response(200, json={"not": "a list"})
