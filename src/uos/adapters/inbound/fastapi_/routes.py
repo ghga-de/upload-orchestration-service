@@ -47,7 +47,6 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 TAGS: list[str | Enum] = ["ResearchDataUploadBoxes"]
-# TODO: fill in possible response codes
 
 
 @router.get(

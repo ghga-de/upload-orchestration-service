@@ -17,9 +17,8 @@
 
 import logging
 
+from ghga_event_schemas.configs import FileUploadBoxEventsConfig
 from hexkit.protocols.daosub import DaoSubscriberProtocol
-from pydantic import Field
-from pydantic_settings import BaseSettings
 
 from uos.core.models import FileUploadBox
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
@@ -27,21 +26,7 @@ from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 log = logging.getLogger(__name__)
 
 
-# TODO: Move this config to ghga-event-schemas
-class FileUploadBoxConfig(BaseSettings):
-    """Config for events communicating changes in FileUploadBoxes
-
-    The event types are hardcoded by `hexkit`.
-    """
-
-    file_upload_box_topic: str = Field(
-        ...,
-        description="Topic containing published FileUploadBox outbox events",
-        examples=["file-upload-boxes", "file-upload-box-topic"],
-    )
-
-
-class OutboxSubConfig(FileUploadBoxConfig):
+class OutboxSubConfig(FileUploadBoxEventsConfig):
     """Configuration for subscribing to outbox events"""
 
 

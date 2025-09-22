@@ -14,28 +14,14 @@
 # limitations under the License.
 """DAO implementation"""
 
+from ghga_event_schemas.configs import ResearchDataUploadBoxEventsConfig
 from hexkit.protocols.daopub import DaoPublisherFactoryProtocol
-from pydantic import Field
-from pydantic_settings import BaseSettings
 
 from uos.constants import BOX_COLLECTION
 from uos.core.models import ResearchDataUploadBox
 from uos.ports.outbound.dao import BoxDao
 
 __all__ = ["OutboxPubConfig", "get_box_dao"]
-
-
-# TODO: Replace this config with the centrally defined one when ready
-class ResearchDataUploadBoxEventsConfig(BaseSettings):
-    """Config for events communicating changes in ResearchDataUploadBoxes.
-    The event types are hardcoded by `hexkit`.
-    """
-
-    research_data_upload_box_topic: str = Field(
-        ...,
-        description="Name of the event topic containing research data upload box events",
-        examples=["research-data-upload-boxes"],
-    )
 
 
 class OutboxPubConfig(ResearchDataUploadBoxEventsConfig):
