@@ -23,6 +23,7 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
+from ghga_event_schemas.pydantic_ import FileUploadBox, ResearchDataUploadBox
 from ghga_service_commons.auth.context import AuthContext
 from hexkit.utils import now_utc_ms_prec
 
@@ -54,7 +55,7 @@ class JointRig:
     """Test fixture containing all components needed for controller testing."""
 
     config: Config
-    box_dao: BaseInMemDao[models.ResearchDataUploadBox]
+    box_dao: BaseInMemDao[ResearchDataUploadBox]
     file_upload_box_client: FileBoxClientPort
     access_client: AccessClientPort
     controller: UploadOrchestrator
@@ -280,7 +281,7 @@ async def test_upsert_file_upload_box_happy(rig: JointRig, populated_boxes: list
     file_upload_box_id = initial_box.file_upload_box_id
 
     # Create a FileUploadBox with updated data
-    updated_file_upload_box = models.FileUploadBox(
+    updated_file_upload_box = FileUploadBox(
         id=file_upload_box_id,  # This should match the file_upload_box_id in our research box
         locked=True,
         file_count=5,
@@ -306,7 +307,7 @@ async def test_upsert_file_upload_box_happy(rig: JointRig, populated_boxes: list
 async def test_upsert_file_upload_box_not_found(rig: JointRig):
     """Test the edge case where a matching Research Data Upload Box doesn't exist."""
     # Create a FileUploadBox with a random ID
-    orphaned_file_upload_box = models.FileUploadBox(
+    orphaned_file_upload_box = FileUploadBox(
         id=uuid4(),
         locked=False,
         file_count=3,

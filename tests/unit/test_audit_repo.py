@@ -21,6 +21,10 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
+from ghga_event_schemas.pydantic_ import (
+    ResearchDataUploadBox,
+    ResearchDataUploadBoxState,
+)
 from hexkit.correlation import get_correlation_id
 from hexkit.providers.testing.eventpub import (
     Event,
@@ -33,7 +37,6 @@ from hexkit.utils import now_utc_ms_prec
 from tests.fixtures import ConfigFixture
 from uos.adapters.outbound.audit import AuditRepository
 from uos.adapters.outbound.event_pub import EventPubTranslator
-from uos.core.models import ResearchDataUploadBox, ResearchDataUploadBoxState
 
 pytestmark = pytest.mark.asyncio()
 

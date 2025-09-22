@@ -18,15 +18,17 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
+from ghga_event_schemas.pydantic_ import (
+    FileUploadBox,
+    ResearchDataUploadBox,
+)
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
 from uos.core.models import (
     BoxRetrievalResults,
-    FileUploadBox,
     GrantWithBoxInfo,
-    ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
 

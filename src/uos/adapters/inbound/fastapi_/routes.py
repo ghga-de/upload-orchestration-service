@@ -21,6 +21,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Query, status
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from pydantic import UUID4, NonNegativeInt
 
 from uos.adapters.inbound.fastapi_.auth import StewardAuthContext, UserAuthContext
@@ -37,7 +38,6 @@ from uos.core.models import (
     CreateUploadBoxRequest,
     GrantAccessRequest,
     GrantWithBoxInfo,
-    ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort

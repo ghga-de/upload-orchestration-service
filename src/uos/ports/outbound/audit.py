@@ -18,9 +18,8 @@
 from abc import ABC, abstractmethod
 from typing import Literal
 
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from pydantic import UUID4
-
-from uos.core.models import ResearchDataUploadBox
 
 
 class AuditRepositoryPort(ABC):

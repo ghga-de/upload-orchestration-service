@@ -19,12 +19,13 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from ghga_service_commons.api.testing import AsyncTestClient
 from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
-from uos.core.models import BoxRetrievalResults, GrantWithBoxInfo, ResearchDataUploadBox
+from uos.core.models import BoxRetrievalResults, GrantWithBoxInfo
 from uos.inject import prepare_rest_app
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.http import FileBoxClientPort

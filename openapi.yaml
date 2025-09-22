@@ -184,7 +184,7 @@ components:
           title: File Count
           type: integer
         file_upload_box_id:
-          description: The ID of the corresponding file upload box.
+          description: The ID of the file upload box.
           format: uuid4
           title: File Upload Box Id
           type: string

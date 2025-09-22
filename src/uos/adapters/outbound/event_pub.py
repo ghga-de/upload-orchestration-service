@@ -16,9 +16,9 @@
 """Event publisher code"""
 
 from ghga_event_schemas.configs import AuditEventsConfig
+from ghga_event_schemas.pydantic_ import AuditRecord
 from hexkit.protocols.eventpub import EventPublisherProtocol
 
-from uos.core.models import AuditRecord
 from uos.ports.outbound.event_pub import EventPublisherPort
 
 

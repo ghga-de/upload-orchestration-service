@@ -18,9 +18,9 @@
 import logging
 
 from ghga_event_schemas.configs import FileUploadBoxEventsConfig
+from ghga_event_schemas.pydantic_ import FileUploadBox
 from hexkit.protocols.daosub import DaoSubscriberProtocol
 
-from uos.core.models import FileUploadBox
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
 log = logging.getLogger(__name__)

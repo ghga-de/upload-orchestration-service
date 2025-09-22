@@ -19,6 +19,11 @@ import logging
 from collections.abc import Sequence
 from uuid import UUID
 
+from ghga_event_schemas.pydantic_ import (
+    FileUploadBox,
+    ResearchDataUploadBox,
+    ResearchDataUploadBoxState,
+)
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from hexkit.protocols.dao import NoHitsFoundError, ResourceNotFoundError
@@ -27,10 +32,7 @@ from pydantic import UUID4
 
 from uos.core.models import (
     BoxRetrievalResults,
-    FileUploadBox,
     GrantWithBoxInfo,
-    ResearchDataUploadBox,
-    ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort

@@ -15,10 +15,10 @@
 """DAO implementation"""
 
 from ghga_event_schemas.configs import ResearchDataUploadBoxEventsConfig
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from hexkit.protocols.daopub import DaoPublisherFactoryProtocol
 
 from uos.constants import BOX_COLLECTION
-from uos.core.models import ResearchDataUploadBox
 from uos.ports.outbound.dao import BoxDao
 
 __all__ = ["OutboxPubConfig", "get_box_dao"]

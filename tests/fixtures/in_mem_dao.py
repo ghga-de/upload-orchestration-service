@@ -21,6 +21,7 @@ from copy import deepcopy
 from typing import Any, TypeVar
 from unittest.mock import AsyncMock, Mock
 
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from hexkit.custom_types import ID
 from hexkit.protocols.dao import (
     MultipleHitsFoundError,
@@ -29,8 +30,6 @@ from hexkit.protocols.dao import (
     ResourceNotFoundError,
 )
 from pydantic import BaseModel
-
-from uos.core.models import ResearchDataUploadBox
 
 DTO = TypeVar("DTO", bound=BaseModel)
 

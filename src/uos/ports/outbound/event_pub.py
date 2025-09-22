@@ -16,7 +16,7 @@
 
 from abc import ABC, abstractmethod
 
-from uos.core.models import AuditRecord
+from ghga_event_schemas.pydantic_ import AuditRecord
 
 __all__ = ["EventPublisherPort"]
 

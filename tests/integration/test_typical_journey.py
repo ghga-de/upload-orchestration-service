@@ -20,13 +20,13 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBoxState
 from ghga_service_commons.auth.ghga import AuthContext
 from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
 from uos.core.models import (
-    ResearchDataUploadBoxState,
     UpdateUploadBoxRequest,
 )
 
