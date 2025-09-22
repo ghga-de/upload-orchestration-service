@@ -92,7 +92,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
                 title="Test Box",
                 description="A test upload box",
                 storage_alias="test-storage",
-                user_id=ds_user_id,
+                data_steward_id=ds_user_id,
             )
         )
     assert audit_event_recorder.recorded_events

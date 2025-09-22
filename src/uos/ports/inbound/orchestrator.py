@@ -58,7 +58,7 @@ class UploadOrchestratorPort(ABC):
         title: str,
         description: str,
         storage_alias: str,
-        user_id: UUID4,
+        data_steward_id: UUID4,
     ) -> UUID4:
         """Create a new research data upload box.
 

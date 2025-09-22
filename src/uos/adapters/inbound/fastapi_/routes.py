@@ -183,7 +183,7 @@ async def create_research_data_upload_box(
             title=request.title,
             description=request.description,
             storage_alias=request.storage_alias,
-            user_id=UUID(auth_context.id),
+            data_steward_id=UUID(auth_context.id),
         )
         return box_id
     except Exception as err:

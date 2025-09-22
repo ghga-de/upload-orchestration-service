@@ -70,7 +70,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         title: str,
         description: str,
         storage_alias: str,
-        user_id: UUID4,
+        data_steward_id: UUID4,
     ) -> UUID4:
         """Create a new research data upload box.
 
@@ -96,14 +96,14 @@ class UploadOrchestrator(UploadOrchestratorPort):
             title=title,
             description=description,
             last_changed=now_utc_ms_prec(),
-            changed_by=user_id,
+            changed_by=data_steward_id,
             file_upload_box_id=file_upload_box_id,
             storage_alias=storage_alias,
         )
 
         # Store in repository & create audit record
         await self._box_dao.insert(box)
-        await self._audit_repository.log_box_created(box=box, user_id=user_id)
+        await self._audit_repository.log_box_created(box=box, user_id=data_steward_id)
         return box.id
 
     async def update_research_data_upload_box(

@@ -92,7 +92,7 @@ async def test_create_research_data_upload_box(rig: JointRig):
         title="Test",
         description="Just a test",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     box = rig.box_dao.latest
@@ -116,7 +116,7 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
         title="Original Title",
         description="Original Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Mock the access client to return that the user has access
@@ -156,7 +156,7 @@ async def test_update_research_data_upload_box_unauthorized(rig: JointRig):
         title="Original Title",
         description="Original Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Create an update request
@@ -202,7 +202,7 @@ async def test_get_upload_box_files_happy(rig: JointRig):
         title="Test Box",
         description="Test Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Mock the file box client to return a list of file IDs
@@ -234,7 +234,7 @@ async def test_get_upload_box_files_access_error(rig: JointRig):
         title="Test Box",
         description="Test Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Mock the access client to return that the user does NOT have access to this box
@@ -279,7 +279,7 @@ async def test_upsert_file_upload_box_happy(rig: JointRig):
         title="Test Box",
         description="Test Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Get the created box to verify initial state
@@ -337,7 +337,7 @@ async def test_get_research_data_upload_box_happy(rig: JointRig):
         title="Test Box",
         description="Test Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Try retrieval with Data Steward credentials
@@ -372,7 +372,7 @@ async def test_get_research_data_upload_box_access_denied(rig: JointRig):
         title="Test Box",
         description="Test Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Mock the access client to return that the user does NOT have access
@@ -414,7 +414,7 @@ async def test_get_upload_access_grants_happy(rig: JointRig):
         title="Test Box",
         description="Test Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Create mock upload grants that would be returned by access client
@@ -481,7 +481,7 @@ async def test_get_upload_access_grants_box_missing(rig: JointRig, caplog):
         title="Valid Box",
         description="Valid Description",
         storage_alias="HD01",
-        user_id=TEST_DS_ID,
+        data_steward_id=TEST_DS_ID,
     )
 
     # Create mock upload grants - one with a valid box ID, one with an invalid box ID
