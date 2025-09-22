@@ -131,6 +131,7 @@ class UploadOrchestratorPort(ABC):
         valid: bool | None = None,
     ) -> list[GrantWithBoxInfo]:
         """Get a list of upload grants with the associated box titles and descriptions.
+        Results are sorted by validity, user ID, IVA ID, box ID, and grant ID.
 
         Raises:
             AccessAPIError: if there's a problem communicating with the access API.

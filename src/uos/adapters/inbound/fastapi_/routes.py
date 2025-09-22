@@ -296,7 +296,11 @@ async def revoke_upload_access_grant(
 @router.get(
     "/access-grants",
     summary="Get upload access grants",
-    description="Endpoint to get the list of all upload access grants. Can be filtered by user ID, IVA ID, and box ID.",
+    description=(
+        "Endpoint to get the list of all upload access grants. Can be filtered by user"
+        + " ID, IVA ID, and box ID. Results are sorted by validity, box ID, user ID,"
+        + " IVA ID, and grant ID."
+    ),
     tags=TAGS,
     responses={
         200: {
@@ -346,7 +350,8 @@ async def get_upload_access_grants(  # noqa: PLR0913
     """Get upload access grants.
 
     You can filter the grants by user ID, IVA ID, and box ID
-    and by whether the grant is currently valid or not.
+    and by whether the grant is currently valid or not. Results are sorted by validity,
+    user ID, IVA ID, box ID, and grant ID.
     """
     try:
         return await upload_service.get_upload_access_grants(

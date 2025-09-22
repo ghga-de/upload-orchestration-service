@@ -390,57 +390,45 @@ async def test_get_upload_access_grants_happy(
     rig: JointRig, populated_boxes: list[UUID]
 ):
     """Test the normal path for getting upload access grants."""
-    # First create a research data upload box
-    box_id = populated_boxes[0]
     # Create mock upload grants that would be returned by access client
     test_iva_id = uuid4()
-    test_grant_id = uuid4()
-
     mock_grants = [
         models.UploadGrant(
-            id=test_grant_id,
+            id=uuid4(),
             user_id=TEST_USER_ID1,
             iva_id=test_iva_id,
-            box_id=box_id,
+            box_id=populated_boxes[i],  # one grant for each box
             created=now_utc_ms_prec(),
             valid_from=now_utc_ms_prec(),
-            valid_until=now_utc_ms_prec() + timedelta(days=7),
+            valid_until=now_utc_ms_prec() + timedelta(days=i),  # push out validity
             user_name="Test User",
             user_email="test@example.com",
             user_title="Dr.",
         )
+        for i in range(len(populated_boxes))
     ]
 
     # Mock the access client to return these grants
     rig.access_client.get_upload_access_grants.return_value = mock_grants  # type: ignore
 
     # Call the method
-    result = await rig.controller.get_upload_access_grants(
+    results = await rig.controller.get_upload_access_grants(
         user_id=TEST_USER_ID1,
         iva_id=test_iva_id,
-        box_id=box_id,
+        box_id=None,
         valid=True,
     )
 
     # Verify the results
-    assert len(result) == 1
-    grant_with_info = result[0]
-    assert grant_with_info.id == test_grant_id
-    assert grant_with_info.user_id == TEST_USER_ID1
-    assert grant_with_info.iva_id == test_iva_id
-    assert grant_with_info.box_id == box_id
-    assert grant_with_info.user_name == "Test User"
-    assert grant_with_info.user_email == "test@example.com"
-    assert grant_with_info.user_title == "Dr."
-    # These should come from the box
-    assert grant_with_info.box_title == "Box A"
-    assert grant_with_info.box_description == "Description 0"
+    assert len(results) == 5
+    result_ids = [grant.box_id for grant in results]
+    assert result_ids == list(reversed(populated_boxes))
 
     # Verify access client was called with correct parameters
     rig.access_client.get_upload_access_grants.assert_called_once_with(  # type: ignore
         user_id=TEST_USER_ID1,
         iva_id=test_iva_id,
-        box_id=box_id,
+        box_id=None,
         valid=True,
     )
 

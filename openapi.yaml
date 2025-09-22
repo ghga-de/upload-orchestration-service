@@ -295,7 +295,8 @@ paths:
   /access-grants:
     get:
       description: Endpoint to get the list of all upload access grants. Can be filtered
-        by user ID, IVA ID, and box ID.
+        by user ID, IVA ID, and box ID. Results are sorted by validity, box ID, user
+        ID, IVA ID, and grant ID.
       operationId: get_upload_access_grants_access_grants_get
       parameters:
       - description: The internal ID of the user

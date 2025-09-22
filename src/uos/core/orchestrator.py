@@ -222,6 +222,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         valid: bool | None = None,
     ) -> list[GrantWithBoxInfo]:
         """Get a list of upload grants with the associated box titles and descriptions.
+        Results are sorted by validity, user ID, IVA ID, box ID, and grant ID.
 
         Raises:
             AccessAPIError: if there's a problem communicating with the access API.
@@ -257,8 +258,18 @@ class UploadOrchestrator(UploadOrchestratorPort):
                     },
                 )
                 continue
-        # Sort grants by id in ascending order for predictability
-        return sorted(grants_with_info, key=lambda x: x.id)
+
+        # Sort grants for predictability
+        return sorted(
+            grants_with_info,
+            key=lambda x: (
+                -x.valid_until.timestamp(),  # DESC valid_until, rest is ASC
+                x.user_id,
+                x.iva_id,
+                x.box_id,
+                x.id,
+            ),
+        )
 
     async def get_upload_box_files(
         self,
