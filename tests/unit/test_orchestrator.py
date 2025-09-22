@@ -123,9 +123,7 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
     rig.access_client.check_box_access.return_value = True  # type: ignore
 
     # Create an update request
-    from uos.core.models import UpdateUploadBoxRequest
-
-    update_request = UpdateUploadBoxRequest(
+    update_request = models.UpdateUploadBoxRequest(
         title="Updated Title", description="Updated Description"
     )
 
@@ -143,6 +141,36 @@ async def test_update_research_data_upload_box_happy(rig: JointRig):
 
     # Verify access client was not used because user is a Data Steward
     rig.access_client.check_box_access.assert_not_called()  # type: ignore
+
+
+async def test_update_research_data_upload_box_unauthorized(rig: JointRig):
+    """Test the scenario where a user tries updating box attributes like title or description.
+
+    Regular users are not authorized to do this, so this should be blocked.
+    """
+    # Mock the access client to return that the user has access (but box doesn't exist)
+    rig.access_client.check_box_access.return_value = True  # type: ignore
+
+    # First create a box to update
+    box_id = await rig.controller.create_research_data_upload_box(
+        title="Original Title",
+        description="Original Description",
+        storage_alias="HD01",
+        user_id=TEST_DS_ID,
+    )
+
+    # Create an update request
+    update_request = models.UpdateUploadBoxRequest(
+        title="Updated Title", description="Updated Description"
+    )
+
+    # Call the update method
+    with pytest.raises(rig.controller.BoxAccessError):
+        await rig.controller.update_research_data_upload_box(
+            box_id=box_id,
+            request=update_request,
+            auth_context=REGULAR_USER_AUTH_CONTEXT,
+        )
 
 
 async def test_update_research_data_upload_box_not_found(rig: JointRig):
