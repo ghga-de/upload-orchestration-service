@@ -47,10 +47,17 @@ class FileUploadBox(BaseModel):
     storage_alias: str = Field(..., description="S3 storage alias to use for uploads")
 
 
+FileUploadState = Literal["init", "inbox", "archived"]
+# init = file upload initiated, but not yet finished
+# inbox = file upload complete, file in inbox
+# archived = file moved out of inbox after completion
+
+
 class FileUpload(BaseModel):
     """A File Upload. These objects are owned by the UCS."""
 
     upload_id: UUID4 = Field(..., description="Unique identifier for the file upload")
+    state: FileUploadState = "init"
     completed: bool = Field(
         default=False, description="Whether or not the file upload has finished"
     )

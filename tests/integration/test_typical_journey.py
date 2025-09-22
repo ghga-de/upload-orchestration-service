@@ -125,11 +125,6 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         title="Updated Test Box",
         description="Updated description",
     )
-    httpx_mock.add_response(  # mock call that checks if DS has access to box
-        method="GET",
-        url=f"{access_url}/upload-access/users/{ds_user_id}/boxes/{box_id}",
-        status_code=200,
-    )
     async with (
         joint_fixture.kafka.record_events(in_topic=audit_topic) as audit_event_recorder,
         joint_fixture.kafka.record_events(
@@ -181,7 +176,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     )
     updated_box = await joint_fixture.upload_orchestrator.get_research_data_upload_box(
         box_id=box_id,
-        user_id=regular_user_id,
+        auth_context=user_auth_context,
     )
     assert updated_box.title == "Updated Test Box"
     assert updated_box.description == "Updated description"
@@ -204,6 +199,6 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     # Verify the box is now locked
     final_box = await joint_fixture.upload_orchestrator.get_research_data_upload_box(
         box_id=box_id,
-        user_id=regular_user_id,
+        auth_context=user_auth_context,
     )
     assert final_box.state == ResearchDataUploadBoxState.LOCKED
