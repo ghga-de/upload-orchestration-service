@@ -549,7 +549,7 @@ async def test_get_boxes_sorting(rig: JointRig, populated_boxes: list[UUID]):
         await sleep(0.001)
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
-            request=models.UpdateUploadBoxRequest(state="locked"),  # type: ignore
+            request=models.UpdateUploadBoxRequest(state="locked"),
             auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 

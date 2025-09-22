@@ -108,7 +108,7 @@ async def test_get_research_data_upload_box(
 
         # normal response (patch mock)
         box = ResearchDataUploadBox(
-            state="open",  # type: ignore
+            state="open",
             title="test",
             description="desc",
             last_changed=now_utc_ms_prec(),
@@ -518,7 +518,7 @@ async def test_get_boxes(
     test_boxes = [
         ResearchDataUploadBox(
             id=uuid4(),
-            state="open",  # type: ignore
+            state="open",
             title="Box A",
             description="Description A",
             last_changed=now_utc_ms_prec(),
@@ -528,7 +528,7 @@ async def test_get_boxes(
         ),
         ResearchDataUploadBox(
             id=uuid4(),
-            state="open",  # type: ignore
+            state="open",
             title="Box B",
             description="Description B",
             last_changed=now_utc_ms_prec(),
