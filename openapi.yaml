@@ -361,7 +361,7 @@ paths:
       - HTTPBearer: []
       summary: Get upload access grants
       tags:
-      - UploadOrchestrationService
+      - ResearchDataUploadBoxes
     post:
       description: Grant upload access to a user for a single research data upload
         box. Users cannot upload any files until they have been granted access to
@@ -378,18 +378,14 @@ paths:
           content:
             application/json:
               schema: {}
-          description: Successful Response
+          description: Upload access granted successfully.
         '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
+          description: Validation error in request body.
       security:
       - HTTPBearer: []
       summary: Grant upload access
       tags:
-      - UploadOrchestrationService
+      - ResearchDataUploadBoxes
   /access-grants/{grant_id}:
     delete:
       description: Revokes an existing upload access grant.
@@ -416,6 +412,8 @@ paths:
       security:
       - HTTPBearer: []
       summary: Revoke an upload access grant
+      tags:
+      - ResearchDataUploadBoxes
   /boxes:
     get:
       description: Returns a list of research data upload boxes. Results are sorted
@@ -462,18 +460,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BoxRetrievalResults'
-          description: Successful Response
+          description: Research data upload boxes successfully retrieved.
         '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
+          description: Validation error in query parameters.
       security:
       - HTTPBearer: []
       summary: List upload boxes
       tags:
-      - UploadOrchestrationService
+      - ResearchDataUploadBoxes
     post:
       description: Create a new research data upload box to label and track related
         file uploads for a given user.
@@ -490,20 +484,16 @@ paths:
             application/json:
               schema:
                 format: uuid4
-                title: Response Create Research Data Upload Box Boxes Post
+                title: Response 201 Create Research Data Upload Box Boxes Post
                 type: string
-          description: Successful Response
+          description: Upload box created successfully.
         '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
+          description: Validation error in request body.
       security:
       - HTTPBearer: []
       summary: Create upload box
       tags:
-      - UploadOrchestrationService
+      - ResearchDataUploadBoxes
   /boxes/{box_id}:
     get:
       description: Returns the details of an existing research data upload box.
@@ -522,7 +512,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResearchDataUploadBox'
-          description: Successful Response
+          description: Upload box details successfully retrieved.
+        '404':
+          description: Upload box not found or access denied.
         '422':
           content:
             application/json:
@@ -533,7 +525,7 @@ paths:
       - HTTPBearer: []
       summary: Get upload box details
       tags:
-      - UploadOrchestrationService
+      - ResearchDataUploadBoxes
     patch:
       description: Update modifiable details for a research data upload box, including
         the description, title, and state. When modifying the state, users are only
@@ -556,18 +548,18 @@ paths:
         required: true
       responses:
         '204':
-          description: Successful Response
+          description: Upload box updated successfully.
+        '403':
+          description: Access denied.
+        '404':
+          description: Upload box not found.
         '422':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-          description: Validation Error
+          description: Validation error in request body.
       security:
       - HTTPBearer: []
       summary: Update upload box
       tags:
-      - UploadOrchestrationService
+      - ResearchDataUploadBoxes
   /boxes/{box_id}/uploads:
     get:
       description: List the file IDs of all files uploaded for a research data upload
@@ -589,9 +581,13 @@ paths:
                 items:
                   format: uuid4
                   type: string
-                title: Response List Upload Box Files Boxes  Box Id  Uploads Get
+                title: Response 200 List Upload Box Files Boxes  Box Id  Uploads Get
                 type: array
-          description: Successful Response
+          description: File IDs successfully retrieved.
+        '401':
+          description: Access denied.
+        '404':
+          description: Upload box not found.
         '422':
           content:
             application/json:
@@ -602,7 +598,7 @@ paths:
       - HTTPBearer: []
       summary: List files in upload box
       tags:
-      - UploadOrchestrationService
+      - ResearchDataUploadBoxes
   /health:
     get:
       description: Used to test if this service is alive
@@ -614,7 +610,5 @@ paths:
               schema: {}
           description: Successful Response
       summary: health
-      tags:
-      - UploadOrchestrationService
 tags:
-- name: UploadOrchestrationService
+- name: ResearchDataUploadBoxes

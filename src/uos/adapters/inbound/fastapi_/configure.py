@@ -35,7 +35,7 @@ def get_openapi_schema(api) -> dict[str, Any]:
         version=__version__,
         description="A service providing a web-accessible management and auth layer"
         + " over upload-path file services.",
-        tags=[{"name": "UploadOrchestrationService"}],
+        tags=[{"name": "ResearchDataUploadBoxes"}],
         routes=api.routes,
     )
 

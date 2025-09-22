@@ -47,14 +47,13 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-TAGS: list[str | Enum] = ["UploadOrchestrationService"]
+TAGS: list[str | Enum] = ["ResearchDataUploadBoxes"]
 # TODO: fill in possible response codes
 
 
 @router.get(
     "/health",
     summary="health",
-    tags=TAGS,
     status_code=200,
 )
 @TRACER.start_as_current_span("routes.health")
@@ -69,6 +68,13 @@ async def health():
     description="Returns a list of research data upload boxes. Results are sorted alphabetically by title.",
     tags=TAGS,
     response_model=BoxRetrievalResults,
+    responses={
+        200: {
+            "model": BoxRetrievalResults,
+            "description": "Research data upload boxes successfully retrieved.",
+        },
+        422: {"description": "Validation error in query parameters."},
+    },
 )
 @TRACER.start_as_current_span("routes.get_research_data_upload_boxes")
 async def get_research_data_upload_boxes(
@@ -120,6 +126,13 @@ async def get_research_data_upload_boxes(
     description="Returns the details of an existing research data upload box.",
     tags=TAGS,
     response_model=ResearchDataUploadBox,
+    responses={
+        200: {
+            "model": ResearchDataUploadBox,
+            "description": "Upload box details successfully retrieved.",
+        },
+        404: {"description": "Upload box not found or access denied."},
+    },
 )
 @TRACER.start_as_current_span("routes.get_research_data_upload_box")
 async def get_research_data_upload_box(
@@ -153,6 +166,10 @@ async def get_research_data_upload_box(
     tags=TAGS,
     response_model=UUID4,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {"model": UUID4, "description": "Upload box created successfully."},
+        422: {"description": "Validation error in request body."},
+    },
 )
 @TRACER.start_as_current_span("routes.create_research_data_upload_box")
 async def create_research_data_upload_box(
@@ -184,6 +201,12 @@ async def create_research_data_upload_box(
     tags=TAGS,
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Upload box updated successfully."},
+        403: {"description": "Access denied."},
+        404: {"description": "Upload box not found."},
+        422: {"description": "Validation error in request body."},
+    },
 )
 @TRACER.start_as_current_span("routes.update_research_data_upload_box")
 async def update_research_data_upload_box(
@@ -213,6 +236,10 @@ async def update_research_data_upload_box(
     + " Users cannot upload any files until they have been granted access to a box.",
     tags=TAGS,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        201: {"description": "Upload access granted successfully."},
+        422: {"description": "Validation error in request body."},
+    },
 )
 @TRACER.start_as_current_span("routes.grant_upload_access")
 async def grant_upload_access(
@@ -240,6 +267,7 @@ async def grant_upload_access(
     "/access-grants/{grant_id}",
     summary="Revoke an upload access grant",
     description="Revokes an existing upload access grant.",
+    tags=TAGS,
     responses={
         204: {
             "description": "Upload access grant has been revoked.",
@@ -266,9 +294,9 @@ async def revoke_upload_access_grant(
 
 @router.get(
     "/access-grants",
-    tags=TAGS,
     summary="Get upload access grants",
     description="Endpoint to get the list of all upload access grants. Can be filtered by user ID, IVA ID, and box ID.",
+    tags=TAGS,
     responses={
         200: {
             "model": list[GrantWithBoxInfo],
@@ -334,6 +362,11 @@ async def get_upload_access_grants(  # noqa: PLR0913
     description="List the file IDs of all files uploaded for a research data upload box.",
     tags=TAGS,
     response_model=list[UUID4],
+    responses={
+        200: {"model": list[UUID4], "description": "File IDs successfully retrieved."},
+        401: {"description": "Access denied."},
+        404: {"description": "Upload box not found."},
+    },
 )
 @TRACER.start_as_current_span("routes.list_upload_box_files")
 async def list_upload_box_files(
