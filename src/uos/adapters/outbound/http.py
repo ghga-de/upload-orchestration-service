@@ -53,7 +53,7 @@ class AccessApiConfig(BaseSettings):
 class FileBoxClientConfig(BaseSettings):
     """Config parameters for interacting with the service owning FileUploadBoxes."""
 
-    file_box_service_url: HttpUrl = Field(
+    ucs_url: HttpUrl = Field(
         ...,
         description="URL pointing to the API of the service that owns FileUploadBoxes"
         + " (currently the UCS).",
@@ -255,7 +255,7 @@ class FileBoxClient(FileBoxClientPort):
     """
 
     def __init__(self, *, config: FileBoxClientConfig):
-        self._file_box_service_url = config.file_box_service_url
+        self._ucs_url = config.ucs_url
         self._signing_key = jwk.JWK.from_json(
             config.work_order_signing_key.get_secret_value()
         )
@@ -277,9 +277,7 @@ class FileBoxClient(FileBoxClientPort):
         """
         headers = self._auth_header(CreateFileBoxWorkOrder())
         body = {"storage_alias": storage_alias}
-        response = httpx.post(
-            f"{self._file_box_service_url}/boxes", headers=headers, json=body
-        )
+        response = httpx.post(f"{self._ucs_url}/boxes", headers=headers, json=body)
         if response.status_code != 201:
             log.error(
                 "Error creating new FileUploadBox in external service with storage alias %s.",
@@ -308,7 +306,7 @@ class FileBoxClient(FileBoxClientPort):
         headers = self._auth_header(wot)
         body = {"lock": True}
         response = httpx.patch(
-            f"{self._file_box_service_url}/boxes/{box_id}", headers=headers, json=body
+            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
         )
         if response.status_code != 204:
             log.error(
@@ -332,7 +330,7 @@ class FileBoxClient(FileBoxClientPort):
         headers = self._auth_header(wot)
         body = {"lock": False}
         response = httpx.patch(
-            f"{self._file_box_service_url}/boxes/{box_id}", headers=headers, json=body
+            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
         )
         if response.status_code != 204:
             log.error(
@@ -353,9 +351,7 @@ class FileBoxClient(FileBoxClientPort):
         """
         wot = ViewFileBoxWorkOrder(box_id=box_id)
         headers = self._auth_header(wot)
-        response = httpx.get(
-            f"{self._file_box_service_url}/boxes/{box_id}/uploads", headers=headers
-        )
+        response = httpx.get(f"{self._ucs_url}/boxes/{box_id}/uploads", headers=headers)
         if response.status_code != 200:
             log.error(
                 "Error unlocking FileUploadBox ID %s in external service.",

@@ -45,7 +45,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     - Setting the state to LOCKED
     """
     # Test data
-    file_box_service_url = joint_fixture.config.file_box_service_url
+    file_box_service_url = joint_fixture.config.ucs_url
     access_url = joint_fixture.config.access_url
     ds_user_id = uuid4()
     regular_user_id = uuid4()

@@ -35,7 +35,7 @@
       "title": "Audit Record Type",
       "type": "string"
     },
-    "file_box_service_url": {
+    "ucs_url": {
       "description": "URL pointing to the API of the service that owns FileUploadBoxes (currently the UCS).",
       "examples": [
         "http://127.0.0.1/upload"
@@ -43,7 +43,7 @@
       "format": "uri",
       "maxLength": 2083,
       "minLength": 1,
-      "title": "File Box Service Url",
+      "title": "Ucs Url",
       "type": "string"
     },
     "work_order_signing_key": {
@@ -500,7 +500,7 @@
     "file_upload_box_topic",
     "audit_record_topic",
     "audit_record_type",
-    "file_box_service_url",
+    "ucs_url",
     "work_order_signing_key",
     "access_url",
     "service_instance_id",
