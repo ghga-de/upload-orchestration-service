@@ -38,7 +38,6 @@ pytestmark = pytest.mark.asyncio()
 TEST_FILE_UPLOAD_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
 TEST_USER_ID1 = UUID("0ef5e39b-3ff2-4685-99e8-5aaf04942c45")
-TEST_USER_ID2 = UUID("43f83c2e-eccb-4ce3-bc97-cf1797b75225")
 
 # Auth context constants for testing
 DATA_STEWARD_AUTH_CONTEXT = Mock(spec=AuthContext)
@@ -48,10 +47,6 @@ DATA_STEWARD_AUTH_CONTEXT.roles = ["data_steward"]
 USER1_AUTH_CONTEXT = Mock(spec=AuthContext)
 USER1_AUTH_CONTEXT.id = str(TEST_USER_ID1)
 USER1_AUTH_CONTEXT.roles = []
-
-USER2_AUTH_CONTEXT = Mock(spec=AuthContext)
-USER2_AUTH_CONTEXT.id = str(TEST_USER_ID2)
-USER2_AUTH_CONTEXT.roles = []
 
 
 @dataclass
@@ -245,7 +240,7 @@ async def test_get_upload_box_files_access_error(
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_upload_box_files(
-            box_id=populated_boxes[0], auth_context=USER2_AUTH_CONTEXT
+            box_id=populated_boxes[0], auth_context=USER1_AUTH_CONTEXT
         )
 
     # Verify that access check was performed
@@ -366,7 +361,7 @@ async def test_get_research_data_upload_box_access_denied(
     # This should raise BoxAccessError since the user doesn't have access
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.get_research_data_upload_box(
-            box_id=populated_boxes[0], auth_context=USER2_AUTH_CONTEXT
+            box_id=populated_boxes[0], auth_context=USER1_AUTH_CONTEXT
         )
 
     # Verify access check was called
@@ -384,7 +379,7 @@ async def test_get_research_data_upload_box_not_found(rig: JointRig):
     # This should raise BoxNotFoundError since the box doesn't exist
     with pytest.raises(rig.controller.BoxNotFoundError):
         await rig.controller.get_research_data_upload_box(
-            box_id=non_existent_box_id, auth_context=USER2_AUTH_CONTEXT
+            box_id=non_existent_box_id, auth_context=USER1_AUTH_CONTEXT
         )
 
     # Verify access check was called first
