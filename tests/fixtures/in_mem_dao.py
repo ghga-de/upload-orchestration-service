@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A dummy DAO"""
+"""A mock DAO"""
 
 from collections.abc import AsyncIterator, Mapping
+from contextlib import suppress
 from copy import deepcopy
 from typing import Any, TypeVar
 from unittest.mock import AsyncMock, Mock
@@ -35,7 +36,7 @@ DTO = TypeVar("DTO", bound=BaseModel)
 
 
 class BaseInMemDao[DTO: BaseModel]:
-    """Base class for dummy DAOs with proper typing and in-memory storage"""
+    """Base class for mock DAOs with proper typing and in-memory storage"""
 
     _id_field: str
     publish_pending = AsyncMock()
@@ -43,18 +44,17 @@ class BaseInMemDao[DTO: BaseModel]:
     with_transaction = Mock()
 
     def __init__(self) -> None:
-        self.resources: list[DTO] = []
+        self.resources: dict[ID, DTO] = {}
 
     @property
     def latest(self) -> DTO:
         """Return the most recently inserted resource"""
-        return deepcopy(self.resources[-1])
+        return deepcopy(next(reversed(self.resources.values())))
 
     async def get_by_id(self, id_: ID) -> DTO:
         """Get the resource via ID."""
-        for resource in self.resources:
-            if id_ == getattr(resource, self._id_field):
-                return deepcopy(resource)
+        with suppress(KeyError):
+            return deepcopy(self.resources[id_])
         raise ResourceNotFoundError(id_=id_)
 
     async def find_one(self, *, mapping: Mapping[str, Any]) -> DTO:
@@ -75,57 +75,47 @@ class BaseInMemDao[DTO: BaseModel]:
 
     async def find_all(self, *, mapping: Mapping[str, Any]) -> AsyncIterator[DTO]:
         """Find all resources that match the specified mapping."""
-        for resource in self.resources:
-            if all([getattr(resource, k) == v for k, v in mapping.items()]):
+        for resource in self.resources.values():
+            if all(getattr(resource, k) == v for k, v in mapping.items()):
                 yield deepcopy(resource)
 
     async def insert(self, dto: DTO) -> None:
         """Insert a resource"""
         dto_id = getattr(dto, self._id_field)
-        for resource in self.resources:
-            if getattr(resource, self._id_field) == dto_id:
-                raise ResourceAlreadyExistsError(id_=dto_id)
-        self.resources.append(deepcopy(dto))
+        if dto_id in self.resources:
+            raise ResourceAlreadyExistsError(id_=dto_id)
+        self.resources[dto_id] = deepcopy(dto)
 
     async def update(self, dto: DTO) -> None:
         """Update a resource"""
-        for i, resource in enumerate(self.resources):
-            if getattr(resource, self._id_field) == getattr(dto, self._id_field):
-                self.resources[i] = deepcopy(dto)
-                break
-        else:
+        dto_id = getattr(dto, self._id_field)
+        if dto_id not in self.resources:
             raise ResourceNotFoundError(id_=getattr(dto, self._id_field))
+        self.resources[dto_id] = deepcopy(dto)
 
     async def delete(self, id_: ID) -> None:
         """Delete a resource by ID"""
-        for i, resource in enumerate(self.resources):
-            if getattr(resource, self._id_field) == id_:
-                del self.resources[i]
-                break
-        else:
+        if id_ not in self.resources:
             raise ResourceNotFoundError(id_=id_)
+        del self.resources[id_]
 
     async def upsert(self, dto: DTO) -> None:
         """Upsert a resource"""
-        for i, resource in enumerate(self.resources):
-            if getattr(resource, self._id_field) == getattr(dto, self._id_field):
-                self.resources[i] = deepcopy(dto)
-                break
-        else:
-            self.resources.append(deepcopy(dto))
+        dto_id = getattr(dto, self._id_field)
+        self.resources[dto_id] = deepcopy(dto)
 
 
 def get_dao[DTO: BaseModel](
     *, dto_model: type[DTO], id_field: str
 ) -> type[BaseInMemDao[DTO]]:
-    """Produce a dummy DAO for the given DTO model and id field"""
+    """Produce a mock DAO for the given DTO model and id field"""
 
-    class DummyDao(BaseInMemDao[DTO]):
-        """Dummy dao that stores data in memory"""
+    class MockDao(BaseInMemDao[DTO]):
+        """Mock dao that stores data in memory"""
 
         _id_field: str = id_field
 
-    return DummyDao
+    return MockDao
 
 
 InMemBoxDao = get_dao(dto_model=ResearchDataUploadBox, id_field="id")
