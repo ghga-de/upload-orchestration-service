@@ -311,9 +311,9 @@ charset-normalizer==3.4.2 \
     # via
     #   -c lock/requirements-dev.txt
     #   requests
-click==8.1.8 \
-    --hash=sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2 \
-    --hash=sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a
+click==8.3.0 \
+    --hash=sha256:9b9f285302c6e3064f4330c05f05b81945b2a39544279343e6e7c5f27a9baddc \
+    --hash=sha256:e7b8232224eba16f4ebe410c25ced9f7875cb5f3263ffc93cc3e8da705e229c4
     # via
     #   -c lock/requirements-dev.txt
     #   typer
@@ -1179,9 +1179,9 @@ referencing==0.36.2 \
     #   -c lock/requirements-dev.txt
     #   jsonschema
     #   jsonschema-specifications
-requests==2.32.4 \
-    --hash=sha256:27babd3cda2a6d50b30443204ee89830707d396671944c998b5975b031ac2b2c \
-    --hash=sha256:27d0316682c8a29834d3264820024b62a36942083d52caf2f14c0591336d3422
+requests==2.32.5 \
+    --hash=sha256:2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6 \
+    --hash=sha256:dbba0bac56e100853db0ea71b82b4dfd5fe2bf6d3754a8893c3af500cec7d7cf
     # via
     #   -c lock/requirements-dev.txt
     #   opentelemetry-exporter-otlp-proto-http
@@ -1340,9 +1340,9 @@ starlette==0.46.2 \
     # via
     #   -c lock/requirements-dev.txt
     #   fastapi
-typer==0.15.3 \
-    --hash=sha256:818873625d0569653438316567861899f7e9972f2e6e0c16dab608345ced713c \
-    --hash=sha256:c86a65ad77ca531f03de08d1b9cb67cd09ad02ddddf4b34745b5008f43b239bd
+typer==0.19.1 \
+    --hash=sha256:914b2b39a1da4bafca5f30637ca26fa622a5bf9f515e5fdc772439f306d5682a \
+    --hash=sha256:cb881433a4b15dacc875bb0583d1a61e78497806741f9aba792abcab390c03e6
     # via
     #   -c lock/requirements-dev.txt
     #   uos (pyproject.toml)
