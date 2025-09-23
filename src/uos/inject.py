@@ -53,7 +53,7 @@ __all__ = [
 @asynccontextmanager
 async def get_persistent_publisher(
     config: Config, dao_factory: MongoDbDaoFactory | None = None
-) -> AsyncGenerator[PersistentKafkaPublisher, None]:
+) -> AsyncGenerator[PersistentKafkaPublisher]:
     """Construct and return a PersistentKafkaPublisher."""
     async with (
         (  # use provided factory if supplied or create new one
@@ -71,9 +71,7 @@ async def get_persistent_publisher(
 
 
 @asynccontextmanager
-async def prepare_core(
-    *, config: Config
-) -> AsyncGenerator[UploadOrchestratorPort, None]:
+async def prepare_core(*, config: Config) -> AsyncGenerator[UploadOrchestratorPort]:
     """Constructs and initializes all core components and their outbound dependencies.
 
     The _override parameters can be used to override the default dependencies.
@@ -123,7 +121,7 @@ async def prepare_rest_app(
     *,
     config: Config,
     upload_orchestrator_override: UploadOrchestratorPort | None = None,
-) -> AsyncGenerator[FastAPI, None]:
+) -> AsyncGenerator[FastAPI]:
     """Construct and initialize an REST API app along with all its dependencies.
     By default, the core dependencies are automatically prepared but you can also
     provide them using the override parameter.
@@ -151,7 +149,7 @@ async def prepare_event_subscriber(
     *,
     config: Config,
     upload_orchestrator_override: UploadOrchestratorPort | None = None,
-) -> AsyncGenerator[KafkaEventSubscriber, None]:
+) -> AsyncGenerator[KafkaEventSubscriber]:
     """Construct and initialize an event subscriber with all its dependencies.
     By default, the core dependencies are automatically prepared but you can also
     provide them using the override parameter.

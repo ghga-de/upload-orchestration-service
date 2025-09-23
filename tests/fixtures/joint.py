@@ -51,7 +51,7 @@ async def joint_fixture(
     mongodb: MongoDbFixture,
     kafka: KafkaFixture,
     config: ConfigFixture,
-) -> AsyncGenerator[JointFixture, None]:
+) -> AsyncGenerator[JointFixture]:
     """A fixture that embeds all other fixtures for API-level integration testing
 
     **Do not call directly** Instead, use get_joint_fixture().
