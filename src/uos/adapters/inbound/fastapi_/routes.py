@@ -60,6 +60,20 @@ async def health():
     return {"status": "OK"}
 
 
+@router.get("/user-health")
+@TRACER.start_as_current_span("routes.user_health")
+async def user_health(auth_context: UserAuthContext):
+    """Health endpoint protected by auth context protocol"""
+    return {"status": "OK"}
+
+
+@router.get("/ds-health")
+@TRACER.start_as_current_span("routes.ds_health")
+async def ds_health(auth_context: StewardAuthContext):
+    """Health endpoint protected by auth context protocol limited to Data Stewards"""
+    return {"status": "OK"}
+
+
 @router.get(
     "/boxes",
     summary="List upload boxes",
