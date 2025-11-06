@@ -49,6 +49,11 @@ components:
           description: The submitted alias from the metadata (unique within the box)
           title: Alias
           type: string
+        box_id:
+          description: The ID of the FileUploadBox this FileUpload belongs to
+          format: uuid4
+          title: Box Id
+          type: string
         checksum:
           description: Unencrypted checksum
           title: Checksum
@@ -58,6 +63,11 @@ components:
           description: Whether or not the file upload has finished
           title: Completed
           type: boolean
+        id:
+          description: Unique identifier for the file upload
+          format: uuid4
+          title: Id
+          type: string
         size:
           description: File size in bytes
           title: Size
@@ -66,13 +76,9 @@ components:
           $ref: '#/components/schemas/FileUploadState'
           default: init
           description: The state of the FileUpload
-        upload_id:
-          description: Unique identifier for the file upload
-          format: uuid4
-          title: Upload Id
-          type: string
       required:
-      - upload_id
+      - id
+      - box_id
       - alias
       - checksum
       - size

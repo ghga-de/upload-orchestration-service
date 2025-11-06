@@ -216,11 +216,13 @@ async def test_get_upload_box_files_happy(rig: JointRig, populated_boxes: list[U
     # Mock the file box client to return a list of FileUpload objects
     test_file_uploads = [
         FileUpload(
-            upload_id=uuid4(),
+            id=uuid4(),
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
             alias=f"test{i}",
             checksum=f"checksum{i}",
             size=1000 + i * 100,
             state=FileUploadState.ARCHIVED,
+            completed=True,
         )
         for i in range(3)
     ]

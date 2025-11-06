@@ -80,11 +80,13 @@ async def test_get_file_upload_list(config: ConfigFixture, httpx_mock: HTTPXMock
     file_upload_box_client = FileBoxClient(config=config.config)
     file_list_response = [
         FileUpload(
-            upload_id=uuid4(),
+            id=uuid4(),
+            box_id=uuid4(),
             alias=f"test{i}",
             checksum=f"checksum{i}",
             size=1000 + i * 100,
             state=FileUploadState.ARCHIVED,
+            completed=True,
         )
         for i in range(3)
     ]

@@ -367,11 +367,13 @@ async def test_list_upload_box_files(
         # normal response with user auth
         file_list = [
             FileUpload(
-                upload_id=uuid4(),
+                id=uuid4(),
+                box_id=TEST_BOX_ID,
                 alias=f"test{i}",
                 checksum=f"checksum{i}",
                 size=1000 + i * 100,
                 state=FileUploadState.ARCHIVED,
+                completed=True,
             )
             for i in range(3)
         ]
