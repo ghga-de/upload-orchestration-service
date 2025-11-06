@@ -30,10 +30,10 @@ from ghga_event_schemas.pydantic_ import (
     ResearchDataUploadBox,
 )
 from ghga_service_commons.auth.context import AuthContext
+from hexkit.providers.testing.dao import BaseInMemDao, new_mock_dao_class
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
-from tests.fixtures.in_mem_dao import BaseInMemDao, InMemBoxDao
 from uos.config import Config
 from uos.core import models
 from uos.core.orchestrator import UploadOrchestrator
@@ -53,6 +53,8 @@ DATA_STEWARD_AUTH_CONTEXT.roles = ["data_steward"]
 USER1_AUTH_CONTEXT = Mock(spec=AuthContext)
 USER1_AUTH_CONTEXT.id = str(TEST_USER_ID1)
 USER1_AUTH_CONTEXT.roles = []
+
+InMemBoxDao = new_mock_dao_class(dto_model=ResearchDataUploadBox, id_field="id")
 
 
 @dataclass
