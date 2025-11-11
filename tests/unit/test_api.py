@@ -383,7 +383,6 @@ async def test_list_upload_box_files(
         response = await rest_client.get(url, headers=user_auth_headers)
         assert response.status_code == 200
         assert response.json() == file_list_json
-        return
 
         # normal response with data steward auth
         response = await rest_client.get(url, headers=ds_auth_headers)

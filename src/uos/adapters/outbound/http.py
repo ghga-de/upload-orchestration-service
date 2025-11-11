@@ -369,7 +369,6 @@ class FileBoxClient(FileBoxClientPort):
 
         try:
             files = response.json()
-            print(files)
             return [FileUpload(**file) for file in files]
         except Exception as err:
             msg = "Failed to extract list of file IDs from response body."

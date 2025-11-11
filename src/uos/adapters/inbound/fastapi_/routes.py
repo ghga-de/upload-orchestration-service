@@ -364,13 +364,13 @@ async def get_upload_access_grants(  # noqa: PLR0913
 @router.get(
     "/boxes/{box_id}/uploads",
     summary="List files in upload box",
-    description="List the file IDs of all files uploaded for a research data upload box.",
+    description="List the details of all files uploads for a research data upload box.",
     tags=TAGS,
     response_model=list[FileUpload],
     responses={
         200: {
             "model": list[FileUpload],
-            "description": "File IDs successfully retrieved.",
+            "description": "File upload information successfully retrieved.",
         },
         401: {"description": "Access denied."},
         404: {"description": "Upload box not found."},

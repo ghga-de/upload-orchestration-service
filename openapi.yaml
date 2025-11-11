@@ -622,7 +622,7 @@ paths:
       - ResearchDataUploadBoxes
   /boxes/{box_id}/uploads:
     get:
-      description: List the file IDs of all files uploaded for a research data upload
+      description: List the details of all files uploads for a research data upload
         box.
       operationId: list_upload_box_files_boxes__box_id__uploads_get
       parameters:
@@ -642,7 +642,7 @@ paths:
                   $ref: '#/components/schemas/FileUpload'
                 title: Response 200 List Upload Box Files Boxes  Box Id  Uploads Get
                 type: array
-          description: File IDs successfully retrieved.
+          description: File upload information successfully retrieved.
         '401':
           description: Access denied.
         '404':
