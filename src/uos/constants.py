@@ -22,3 +22,4 @@ TRACER = trace.get_tracer_provider().get_tracer(SERVICE_NAME)
 BOX_COLLECTION = "boxes"
 AUDIT_COLLECTION = "auditLogs"
 WORK_ORDER_TOKEN_VALID_SECONDS = 30
+ACCESSION_MAPS_COLLECTION = "accessionMaps"

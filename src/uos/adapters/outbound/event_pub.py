@@ -20,7 +20,7 @@ from ghga_event_schemas.pydantic_ import AuditRecord
 from hexkit.protocols.eventpub import EventPublisherProtocol
 from pydantic import Field
 
-from uos.core.models import FileAccessionMap
+from uos.core.models import AccessionMap
 from uos.ports.outbound.event_pub import EventPublisherPort
 
 
@@ -57,7 +57,7 @@ class EventPubTranslator(EventPublisherPort):
             key=f"uos-{audit_record.id}",
         )
 
-    async def publish_accession_map(self, *, accession_map: FileAccessionMap):
+    async def publish_accession_map(self, *, accession_map: AccessionMap):
         """Publish a file accession map"""
         await self._provider.publish(
             payload=accession_map.model_dump(),

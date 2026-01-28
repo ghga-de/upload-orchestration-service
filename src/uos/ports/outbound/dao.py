@@ -18,6 +18,9 @@
 from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from hexkit.protocols.dao import Dao
 
-__all__ = ["BoxDao"]
+from uos.core.models import AccessionMap
+
+__all__ = ["AccessionMapDao", "BoxDao"]
 
 BoxDao = Dao[ResearchDataUploadBox]
+AccessionMapDao = Dao[AccessionMap]

@@ -16,10 +16,12 @@
 
 from ghga_event_schemas.configs import ResearchDataUploadBoxEventsConfig
 from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
+from hexkit.protocols.dao import DaoFactoryProtocol
 from hexkit.protocols.daopub import DaoPublisherFactoryProtocol
 
-from uos.constants import BOX_COLLECTION
-from uos.ports.outbound.dao import BoxDao
+from uos.constants import ACCESSION_MAPS_COLLECTION, BOX_COLLECTION
+from uos.core.models import AccessionMap
+from uos.ports.outbound.dao import AccessionMapDao, BoxDao
 
 __all__ = ["OutboxPubConfig", "get_box_dao"]
 
@@ -46,4 +48,13 @@ async def get_box_dao(
         autopublish=True,
         dto_to_event=_dto_to_event,
         event_topic=config.research_data_upload_box_topic,
+    )
+
+
+async def get_accession_map_dao(*, dao_factory: DaoFactoryProtocol) -> AccessionMapDao:
+    """Construct an AccessionMap DAO from the provided dao_factory"""
+    return await dao_factory.get_dao(
+        name=ACCESSION_MAPS_COLLECTION,
+        dto_model=AccessionMap,
+        id_field="box_id",
     )

@@ -153,7 +153,7 @@ class BoxRetrievalResults(BaseModel):
     )
 
 
-class FileAccessionMap(BaseModel):
+class AccessionMap(BaseModel):
     """A map of file IDs to accession numbers for a box"""
 
     box_id: UUID4 = Field(..., description="ID of the RDUB this accession map is for")
