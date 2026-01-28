@@ -64,6 +64,7 @@ async def get_persistent_publisher(
         PersistentKafkaPublisher.construct(
             config=config,
             dao_factory=_dao_factory,
+            compacted_topics={config.accession_map_topic},
             collection_name="uosPersistedEvents",
         ) as persistent_publisher,
     ):

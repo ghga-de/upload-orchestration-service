@@ -18,12 +18,25 @@
 from ghga_event_schemas.configs import AuditEventsConfig
 from ghga_event_schemas.pydantic_ import AuditRecord
 from hexkit.protocols.eventpub import EventPublisherProtocol
+from pydantic import Field
 
+from uos.core.models import FileAccessionMap
 from uos.ports.outbound.event_pub import EventPublisherPort
 
 
 class EventPubConfig(AuditEventsConfig):
     """Config for publishing events"""
+
+    accession_map_topic: str = Field(
+        default=...,
+        description="The name of the topic used for file accession map events",
+        examples=["accession-maps", "file-accession-maps"],
+    )
+    accession_map_type: str = Field(
+        default=...,
+        description="The event type to use for file accession map events",
+        examples=["accession_map", "file_accession_map"],
+    )
 
 
 class EventPubTranslator(EventPublisherPort):
@@ -42,4 +55,13 @@ class EventPubTranslator(EventPublisherPort):
             type_=self._config.audit_record_type,
             topic=self._config.audit_record_topic,
             key=f"uos-{audit_record.id}",
+        )
+
+    async def publish_accession_map(self, *, accession_map: FileAccessionMap):
+        """Publish a file accession map"""
+        await self._provider.publish(
+            payload=accession_map.model_dump(),
+            type_=self._config.accession_map_type,
+            topic=self._config.accession_map_topic,
+            key=f"uos-box-{accession_map.box_id}",
         )

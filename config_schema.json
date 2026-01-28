@@ -35,6 +35,24 @@
       "title": "Audit Record Type",
       "type": "string"
     },
+    "accession_map_topic": {
+      "description": "The name of the topic used for file accession map events",
+      "examples": [
+        "accession-maps",
+        "file-accession-maps"
+      ],
+      "title": "Accession Map Topic",
+      "type": "string"
+    },
+    "accession_map_type": {
+      "description": "The event type to use for file accession map events",
+      "examples": [
+        "accession_map",
+        "file_accession_map"
+      ],
+      "title": "Accession Map Type",
+      "type": "string"
+    },
     "ucs_url": {
       "description": "URL pointing to the API of the service that owns FileUploadBoxes (currently the UCS).",
       "examples": [
@@ -500,6 +518,8 @@
     "file_upload_box_topic",
     "audit_record_topic",
     "audit_record_type",
+    "accession_map_topic",
+    "accession_map_type",
     "ucs_url",
     "work_order_signing_key",
     "access_url",

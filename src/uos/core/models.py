@@ -151,3 +151,15 @@ class BoxRetrievalResults(BaseModel):
     boxes: list[ResearchDataUploadBox] = Field(
         ..., description="The retrieved research data upload boxes"
     )
+
+
+class FileAccessionMap(BaseModel):
+    """A map of file IDs to accession numbers for a box"""
+
+    box_id: UUID4 = Field(..., description="ID of the RDUB this accession map is for")
+    mapping: dict[UUID4, str] = Field(
+        ...,
+        description=(
+            "A mapping where the keys are UUID4 file IDs and the values are accessions."
+        ),
+    )
