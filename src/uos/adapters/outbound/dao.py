@@ -18,6 +18,7 @@ from ghga_event_schemas.configs import ResearchDataUploadBoxEventsConfig
 from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from hexkit.protocols.dao import DaoFactoryProtocol
 from hexkit.protocols.daopub import DaoPublisherFactoryProtocol
+from hexkit.providers.mongodb import MongoDbIndex
 
 from uos.constants import ACCESSION_MAPS_COLLECTION, BOX_COLLECTION
 from uos.core.models import AccessionMap
@@ -52,9 +53,15 @@ async def get_box_dao(
 
 
 async def get_accession_map_dao(*, dao_factory: DaoFactoryProtocol) -> AccessionMapDao:
-    """Construct an AccessionMap DAO from the provided dao_factory"""
+    """Construct an AccessionMap DAO from the provided dao_factory.
+
+    A unique index over mapping.accession is created.
+    """
     return await dao_factory.get_dao(
         name=ACCESSION_MAPS_COLLECTION,
         dto_model=AccessionMap,
         id_field="box_id",
+        indexes=[
+            MongoDbIndex(fields="mappings.accession", properties={"unique": True})
+        ],
     )

@@ -20,8 +20,8 @@ from enum import Enum
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
-from ghga_event_schemas.pydantic_ import FileUpload, ResearchDataUploadBox
+from fastapi import APIRouter, HTTPException, Query, status
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from pydantic import UUID4, NonNegativeInt
 
 from uos.adapters.inbound.fastapi_.auth import StewardAuthContext, UserAuthContext
@@ -34,8 +34,10 @@ from uos.adapters.inbound.fastapi_.http_exceptions import (
 )
 from uos.constants import TRACER
 from uos.core.models import (
+    AccessionMap,
     BoxRetrievalResults,
     CreateUploadBoxRequest,
+    FileUpload,
     GrantAccessRequest,
     GrantWithBoxInfo,
     UpdateUploadBoxRequest,
@@ -396,3 +398,33 @@ async def list_upload_box_files(
     except Exception as err:
         log.error(err, exc_info=True)
         raise HttpInternalError(message="Failed to list upload box files") from err
+
+
+@router.patch(
+    "/boxes/{box_id}/accessions",
+    summary="Map file IDs to accession numbers for files in the upload box",
+    tags=TAGS,
+    response_model=None,
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Accession map successfully submitted."},
+        403: {"description": "Access denied."},
+        404: {"description": "Upload box not found."},
+        422: {"description": "Validation error in request body."},
+    },
+)
+@TRACER.start_as_current_span("routes.submit_accession_map")
+async def submit_accession_map(
+    box_id: UUID,
+    request: AccessionMap,
+    upload_service: UploadOrchestratorDummy,
+    auth_context: StewardAuthContext,
+) -> None:
+    """Update a ResearchDataUploadBox."""
+    try:
+        await upload_service.update_accession_map(accession_map=request)
+        # TODO: either change request name or use Request object
+    except UploadOrchestratorPort.AccessionMapError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
+    except UploadOrchestratorPort.BoxNotFoundError as err:
+        raise HttpBoxNotFoundError(box_id=request.box_id) from err

@@ -19,25 +19,30 @@ import logging
 from uuid import UUID
 
 from ghga_event_schemas.pydantic_ import (
-    FileUpload,
     FileUploadBox,
     ResearchDataUploadBox,
     ResearchDataUploadBoxState,
 )
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
-from hexkit.protocols.dao import NoHitsFoundError, ResourceNotFoundError
+from hexkit.protocols.dao import (
+    NoHitsFoundError,
+    ResourceNotFoundError,
+    UniqueConstraintViolationError,
+)
 from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
 from uos.core.models import (
+    AccessionMap,
     BoxRetrievalResults,
+    FileUpload,
     GrantWithBoxInfo,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.audit import AuditRepositoryPort
-from uos.ports.outbound.dao import BoxDao
+from uos.ports.outbound.dao import AccessionMapDao, BoxDao
 from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
 
 log = logging.getLogger(__name__)
@@ -57,11 +62,13 @@ class UploadOrchestrator(UploadOrchestratorPort):
         self,
         *,
         box_dao: BoxDao,
+        accession_map_dao: AccessionMapDao,
         audit_repository: AuditRepositoryPort,
         file_upload_box_client: FileBoxClientPort,
         access_client: AccessClientPort,
     ):
         self._box_dao = box_dao
+        self._accession_map_dao = accession_map_dao
         self._audit_repository = audit_repository
         self._file_upload_box_client = file_upload_box_client
         self._access_client = access_client
@@ -299,6 +306,18 @@ class UploadOrchestrator(UploadOrchestratorPort):
             box_id=upload_box.file_upload_box_id,
         )
 
+        # Get accessions from database
+        try:
+            accessions = await self._accession_map_dao.get_by_id(box_id)
+        except ResourceNotFoundError:
+            log.warning("No accession map found for box ID %s", box_id)
+        else:
+            acc_dict = {item.file_id: item.accession for item in accessions.mappings}
+            for i in range(len(file_uploads)):
+                file_id = file_uploads[i].id
+                if file_id in acc_dict:
+                    file_uploads[i].accession = acc_dict.get(file_id)
+
         # Sort files by alias for predictability
         return sorted(file_uploads, key=lambda x: x.alias)
 
@@ -436,3 +455,51 @@ class UploadOrchestrator(UploadOrchestratorPort):
             boxes = boxes[:limit]
 
         return BoxRetrievalResults(count=count, boxes=boxes)
+
+    async def update_accession_map(self, *, accession_map: AccessionMap) -> None:
+        """Update the file accession map for a given box.
+
+        This method makes a call to the File Box API to get the latest list of
+        files in that upload box. Then, it verifies that each file ID in the mapping
+        exists in the retrieved list of files. Finally, it stores the mapping in the DB.
+
+        Raises:
+            BoxNotFoundError: If the box doesn't exist
+            AccessionMapError: If the accession map includes a file ID that doesn't
+                exist or if there are duplicate accessions.
+        """
+        # Make sure the box exists
+        box_id = accession_map.box_id
+        try:
+            box = await self._box_dao.get_by_id(box_id)
+        except ResourceNotFoundError as err:
+            raise self.BoxNotFoundError(box_id=box_id) from err
+
+        # Check for duplicate accession numbers within this set before storing
+        accessions = set(mapping.accession for mapping in accession_map.mappings)
+        if len(accessions) < len(accession_map.mappings):
+            raise self.AccessionMapError("Duplicate accessions detected in mapping")
+
+        # Get files list from File Box API
+        files = await self._file_upload_box_client.get_file_upload_list(
+            box_id=box.file_upload_box_id
+        )
+        file_ids_in_box = set(f.id for f in files)
+        file_ids_in_map = set(mapping.file_id for mapping in accession_map.mappings)
+        invalid_ids = file_ids_in_map - file_ids_in_box
+
+        if invalid_ids:
+            raise self.AccessionMapError(
+                "Invalid accession map. These file IDs are not in the box:"
+                + f" {', '.join(map(str, invalid_ids))}"
+            )
+
+        try:
+            await self._accession_map_dao.upsert(accession_map)
+        except UniqueConstraintViolationError as err:
+            error = self.AccessionMapError(
+                "Failed to update accession mapping. At least one accession included"
+                + " in the supplied mapping already exists in the database."
+            )
+            log.error(error, extra={"box_id": accession_map.box_id})
+            raise error from err

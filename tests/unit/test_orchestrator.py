@@ -23,12 +23,7 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
-from ghga_event_schemas.pydantic_ import (
-    FileUpload,
-    FileUploadBox,
-    FileUploadState,
-    ResearchDataUploadBox,
-)
+from ghga_event_schemas.pydantic_ import FileUploadBox, ResearchDataUploadBox
 from ghga_service_commons.auth.context import AuthContext
 from hexkit.providers.testing.dao import BaseInMemDao, new_mock_dao_class
 from hexkit.utils import now_utc_ms_prec
@@ -55,6 +50,7 @@ USER1_AUTH_CONTEXT.id = str(TEST_USER_ID1)
 USER1_AUTH_CONTEXT.roles = []
 
 InMemBoxDao = new_mock_dao_class(dto_model=ResearchDataUploadBox, id_field="id")
+InMemAccessionMapDao = new_mock_dao_class(dto_model=models.AccessionMap, id_field="id")
 
 
 @dataclass
@@ -63,6 +59,7 @@ class JointRig:
 
     config: Config
     box_dao: BaseInMemDao[ResearchDataUploadBox]
+    accession_map_dao: BaseInMemDao[models.AccessionMap]
     file_upload_box_client: FileBoxClientPort
     access_client: AccessClientPort
     controller: UploadOrchestrator
@@ -83,6 +80,7 @@ def rig(config: ConfigFixture) -> JointRig:
 
     controller = UploadOrchestrator(
         box_dao=(box_dao := InMemBoxDao()),  # type: ignore
+        accession_map_dao=(accession_map_dao := InMemAccessionMapDao()),
         file_upload_box_client=file_box_client_mock,
         access_client=access_client_mock,
         audit_repository=AsyncMock(),
@@ -91,6 +89,7 @@ def rig(config: ConfigFixture) -> JointRig:
     return JointRig(
         config=_config,
         box_dao=box_dao,
+        accession_map_dao=accession_map_dao,
         file_upload_box_client=file_box_client_mock,
         access_client=access_client_mock,
         controller=controller,
@@ -217,14 +216,17 @@ async def test_get_upload_box_files_happy(rig: JointRig, populated_boxes: list[U
     """Test the normal path of getting a list of FileUpload objects for a box from the file box service."""
     # Mock the file box client to return a list of FileUpload objects
     test_file_uploads = [
-        FileUpload(
+        models.FileUpload(
             id=uuid4(),
             box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
             alias=f"test{i}",
-            checksum=f"checksum{i}",
-            size=1000 + i * 100,
-            state=FileUploadState.ARCHIVED,
-            completed=True,
+            decrypted_sha256=f"checksum{i}",
+            decrypted_size=1000 + i * 100,
+            part_size=100,
+            state="archived",
+            state_updated=now_utc_ms_prec(),
         )
         for i in range(3)
     ]

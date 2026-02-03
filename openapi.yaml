@@ -1,5 +1,24 @@
 components:
   schemas:
+    AccessionMap:
+      description: A map of file IDs to accession numbers for a box
+      properties:
+        box_id:
+          description: ID of the RDUB this accession map is for
+          format: uuid4
+          title: Box Id
+          type: string
+        mappings:
+          description: A list of items where each contains a file_id and accession
+          items:
+            $ref: '#/components/schemas/FileIdToAccession'
+          title: Mappings
+          type: array
+      required:
+      - box_id
+      - mappings
+      title: AccessionMap
+      type: object
     BoxRetrievalResults:
       description: A model encapsulating retrieved research data upload boxes and
         the count thereof.
@@ -41,6 +60,21 @@ components:
       - description
       - storage_alias
       title: CreateUploadBoxRequest
+      type: object
+    FileIdToAccession:
+      description: Mapping of file ID to accession for a single file
+      properties:
+        accession:
+          title: Accession
+          type: string
+        file_id:
+          format: uuid4
+          title: File Id
+          type: string
+      required:
+      - file_id
+      - accession
+      title: FileIdToAccession
       type: object
     FileUpload:
       description: A File Upload.
@@ -618,6 +652,38 @@ paths:
       security:
       - HTTPBearer: []
       summary: Update upload box
+      tags:
+      - ResearchDataUploadBoxes
+  /boxes/{box_id}/accessions:
+    patch:
+      description: Update a ResearchDataUploadBox.
+      operationId: submit_accession_map_boxes__box_id__accessions_patch
+      parameters:
+      - in: path
+        name: box_id
+        required: true
+        schema:
+          format: uuid
+          title: Box Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessionMap'
+        required: true
+      responses:
+        '204':
+          description: Accession map successfully submitted.
+        '403':
+          description: Access denied.
+        '404':
+          description: Upload box not found.
+        '422':
+          description: Validation error in request body.
+      security:
+      - HTTPBearer: []
+      summary: Map file IDs to accession numbers for files in the upload box
       tags:
       - ResearchDataUploadBoxes
   /boxes/{box_id}/uploads:

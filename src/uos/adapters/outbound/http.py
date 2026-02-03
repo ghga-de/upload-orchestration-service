@@ -20,7 +20,6 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from ghga_event_schemas.pydantic_ import FileUpload
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from jwcrypto import jwk
 from pydantic import UUID4, Field, HttpUrl, SecretStr
@@ -30,6 +29,7 @@ from uos.core.models import (
     BaseWorkOrderToken,
     ChangeFileBoxWorkOrder,
     CreateFileBoxWorkOrder,
+    FileUpload,
     UploadGrant,
     ViewFileBoxWorkOrder,
 )

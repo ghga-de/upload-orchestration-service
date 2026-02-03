@@ -19,17 +19,13 @@ from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
-from ghga_event_schemas.pydantic_ import (
-    FileUpload,
-    FileUploadState,
-    ResearchDataUploadBox,
-)
+from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from ghga_service_commons.api.testing import AsyncTestClient
 from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
 from hexkit.utils import now_utc_ms_prec
 
 from tests.fixtures import ConfigFixture
-from uos.core.models import BoxRetrievalResults, GrantWithBoxInfo
+from uos.core.models import BoxRetrievalResults, FileUpload, GrantWithBoxInfo
 from uos.inject import prepare_rest_app
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.http import FileBoxClientPort
@@ -369,11 +365,14 @@ async def test_list_upload_box_files(
             FileUpload(
                 id=uuid4(),
                 box_id=TEST_BOX_ID,
+                storage_alias="HD01",
+                bucket_id="inbox",
                 alias=f"test{i}",
-                checksum=f"checksum{i}",
-                size=1000 + i * 100,
-                state=FileUploadState.ARCHIVED,
-                completed=True,
+                decrypted_sha256=f"checksum{i}",
+                decrypted_size=1000 + i * 100,
+                part_size=100,
+                state="archived",
+                state_updated=now_utc_ms_prec(),
             )
             for i in range(3)
         ]

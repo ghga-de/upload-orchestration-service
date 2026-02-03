@@ -17,17 +17,15 @@
 
 from abc import ABC, abstractmethod
 
-from ghga_event_schemas.pydantic_ import (
-    FileUpload,
-    FileUploadBox,
-    ResearchDataUploadBox,
-)
+from ghga_event_schemas.pydantic_ import FileUploadBox, ResearchDataUploadBox
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
 from uos.core.models import (
+    AccessionMap,
     BoxRetrievalResults,
+    FileUpload,
     GrantWithBoxInfo,
     UpdateUploadBoxRequest,
 )
@@ -47,11 +45,14 @@ class UploadOrchestratorPort(ABC):
             super().__init__(msg)
 
     class GrantNotFoundError(RuntimeError):
-        """Raise when unable to revoke a grant because it doesn't exist."""
+        """Raised when unable to revoke a grant because it doesn't exist."""
 
         def __init__(self, *, grant_id: UUID4) -> None:
             msg = f"Failed to revoke grant {grant_id} because it doesn't exist."
             super().__init__(msg)
+
+    class AccessionMapError(RuntimeError):
+        """Raised when an accession map includes a file ID that doesn't exist."""
 
     @abstractmethod
     async def create_research_data_upload_box(
@@ -200,5 +201,19 @@ class UploadOrchestratorPort(ABC):
         recently changed, and then by box ID.
 
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
+        """
+        ...
+
+    @abstractmethod
+    async def update_accession_map(self, *, accession_map: AccessionMap) -> None:
+        """Update the file accession map for a given box.
+
+        This method makes a call to the File Box API to get the latest list of
+        files in that upload box. Then, it verifies that each file ID in the mapping
+        exists in the retrieved list of files. Finally, it stores the mapping in the DB.
+
+        Raises:
+            AccessionMapError: If the accession map includes a file ID that doesn't
+                exist or if there are duplicate accessions.
         """
         ...

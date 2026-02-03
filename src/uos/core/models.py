@@ -153,13 +153,64 @@ class BoxRetrievalResults(BaseModel):
     )
 
 
+class FileIdToAccession(BaseModel):
+    """Mapping of file ID to accession for a single file"""
+
+    file_id: UUID4
+    accession: str
+
+
 class AccessionMap(BaseModel):
     """A map of file IDs to accession numbers for a box"""
 
     box_id: UUID4 = Field(..., description="ID of the RDUB this accession map is for")
-    mapping: dict[UUID4, str] = Field(
+    mappings: list[FileIdToAccession] = Field(
         ...,
-        description=(
-            "A mapping where the keys are UUID4 file IDs and the values are accessions."
-        ),
+        description="A list of items where each contains a file_id and accession",
+    )
+
+
+FileUploadState = Literal[
+    "init",
+    "inbox",
+    "failed",
+    "cancelled",
+    "interrogated",
+    "awaiting_archival",
+    "archived",
+]
+
+
+class FileUpload(BaseModel):
+    """A FileUpload"""
+
+    id: UUID4 = Field(..., description="Unique identifier for the file upload")
+    box_id: UUID4
+    alias: str
+    state: FileUploadState = Field(
+        default="init", description="The state of the FileUpload"
+    )
+    state_updated: UTCDatetime = Field(
+        ..., description="Timestamp of when state was updated"
+    )
+    storage_alias: str = Field(
+        ..., description="The storage alias of the Data Hub housing the file"
+    )
+    bucket_id: str = Field(
+        ..., description="The name of the bucket where the file is currently stored"
+    )
+    decrypted_sha256: str | None = Field(
+        default=None,
+        description="SHA-256 checksum of the entire unencrypted file content",
+    )
+    decrypted_size: int = Field(..., description="The size of the unencrypted file")
+    encrypted_size: int | None = Field(
+        default=None, description="The encrypted size of the file before re-encryption"
+    )
+    part_size: int = Field(
+        ...,
+        description="The number of bytes in each file part (last part is likely smaller)",
+    )
+    accession: str | None = Field(
+        default=None, description="The accession number assigned to this file."
     )

@@ -17,11 +17,10 @@
 
 from abc import ABC, abstractmethod
 
-from ghga_event_schemas.pydantic_ import FileUpload
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
-from uos.core.models import UploadGrant
+from uos.core.models import FileUpload, UploadGrant
 
 
 class AccessClientPort(ABC):
