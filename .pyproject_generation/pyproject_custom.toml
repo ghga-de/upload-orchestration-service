@@ -6,7 +6,7 @@ dependencies = [
     "typer >= 0.15",
     "ghga-service-commons[api,auth,crypt] >= 4.2",
     "ghga-event-schemas ~= 10.1",
-    "hexkit[akafka,mongodb,opentelemetry] >= 7.0",
+    "hexkit[akafka,mongodb,opentelemetry] >= 8.0",
 ]
 
 [project.urls]
