@@ -16,11 +16,12 @@
 
 from typing import Literal
 
-from ghga_event_schemas.pydantic_ import AuditRecord, ResearchDataUploadBox
+from ghga_event_schemas.pydantic_ import AuditRecord
 from hexkit.correlation import get_correlation_id
 from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
+from uos.core.models import ResearchDataUploadBox
 from uos.ports.outbound.audit import AuditRepositoryPort
 from uos.ports.outbound.event_pub import EventPublisherPort
 

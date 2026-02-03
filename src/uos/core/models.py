@@ -16,11 +16,8 @@
 """Data models for the Upload Orchestration Service."""
 
 from typing import Literal
+from uuid import uuid4
 
-from ghga_event_schemas.pydantic_ import (
-    ResearchDataUploadBox,
-    ResearchDataUploadBoxState,
-)
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import (
     UUID4,
@@ -31,6 +28,32 @@ from pydantic import (
     ValidationInfo,
     field_validator,
 )
+
+UploadBoxState = Literal["open", "locked", "archived"]
+
+
+class ResearchDataUploadBox(BaseModel):
+    """A class representing a ResearchDataUploadBox."""
+
+    id: UUID4 = Field(
+        default_factory=uuid4,
+        description="Unique identifier for the research data upload box",
+    )
+    state: UploadBoxState = Field(..., description="Current state of the upload box")
+    title: str = Field(..., description="Short meaningful name for the box")
+    description: str = Field(..., description="Describes the upload box in more detail")
+    last_changed: UTCDatetime = Field(..., description="Timestamp of the latest change")
+    changed_by: UUID4 = Field(
+        ..., description="ID of the user who performed the latest change"
+    )
+    file_upload_box_id: UUID4 = Field(..., description="The ID of the file upload box.")
+    locked: bool = Field(
+        default=False,
+        description="Whether or not changes to the files in the file upload box are allowed",
+    )
+    file_count: int = Field(default=0, description="The number of files in the box")
+    size: int = Field(default=0, description="The total size of all files in the box")
+    storage_alias: str = Field(..., description="S3 storage alias to use for uploads")
 
 
 class BaseWorkOrderToken(BaseModel):
@@ -84,9 +107,7 @@ class UpdateUploadBoxRequest(BaseModel):
 
     title: str | None = Field(default=None, description="Updated title")
     description: str | None = Field(default=None, description="Updated description")
-    state: ResearchDataUploadBoxState | None = Field(
-        default=None, description="Updated state"
-    )
+    state: UploadBoxState | None = Field(default=None, description="Updated state")
 
 
 class GrantAccessRequest(BaseModel):
@@ -181,8 +202,8 @@ FileUploadState = Literal[
 ]
 
 
-class FileUpload(BaseModel):
-    """A FileUpload"""
+class FileUploadWithAccession(BaseModel):
+    """A FileUpload with its accession"""
 
     id: UUID4 = Field(..., description="Unique identifier for the file upload")
     box_id: UUID4

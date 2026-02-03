@@ -23,13 +23,15 @@ from pydantic import UUID4
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
-from uos.core.models import AccessionMap, FileIdToAccession, FileUpload
+from uos.core.models import AccessionMap, FileIdToAccession, FileUploadWithAccession
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
 
-def make_file_upload(*, box_id: UUID4, file_id: UUID4 = uuid4()) -> FileUpload:
+def make_file_upload(
+    *, box_id: UUID4, file_id: UUID4 = uuid4()
+) -> FileUploadWithAccession:
     """Make a FileUpload instance"""
-    return FileUpload(
+    return FileUploadWithAccession(
         id=file_id,
         box_id=box_id,
         alias="file1",

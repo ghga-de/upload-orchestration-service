@@ -29,7 +29,7 @@ from uos.core.models import (
     BaseWorkOrderToken,
     ChangeFileBoxWorkOrder,
     CreateFileBoxWorkOrder,
-    FileUpload,
+    FileUploadWithAccession,
     UploadGrant,
     ViewFileBoxWorkOrder,
 )
@@ -347,7 +347,9 @@ class FileBoxClient(FileBoxClientPort):
             )
             raise self.OperationError("Failed to unlock FileUploadBox.")
 
-    async def get_file_upload_list(self, *, box_id: UUID4) -> list[FileUpload]:
+    async def get_file_upload_list(
+        self, *, box_id: UUID4
+    ) -> list[FileUploadWithAccession]:
         """Get list of file uploads in a FileUploadBox.
 
         Raises:
@@ -369,7 +371,7 @@ class FileBoxClient(FileBoxClientPort):
 
         try:
             files = response.json()
-            return [FileUpload(**file) for file in files]
+            return [FileUploadWithAccession(**file) for file in files]
         except Exception as err:
             msg = "Failed to extract list of file IDs from response body."
             log.error(msg, exc_info=True)

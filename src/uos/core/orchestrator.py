@@ -18,11 +18,7 @@
 import logging
 from uuid import UUID
 
-from ghga_event_schemas.pydantic_ import (
-    FileUploadBox,
-    ResearchDataUploadBox,
-    ResearchDataUploadBoxState,
-)
+from ghga_event_schemas.pydantic_ import FileUploadBox
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from hexkit.protocols.dao import (
@@ -36,8 +32,9 @@ from pydantic import UUID4
 from uos.core.models import (
     AccessionMap,
     BoxRetrievalResults,
-    FileUpload,
+    FileUploadWithAccession,
     GrantWithBoxInfo,
+    ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
@@ -101,7 +98,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Create ResearchDataUploadBox
         box = ResearchDataUploadBox(
-            state=ResearchDataUploadBoxState.OPEN,
+            state="open",
             title=title,
             description=description,
             last_changed=now_utc_ms_prec(),
@@ -141,25 +138,20 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # If not a data steward, the only acceptable update is to move from OPEN to LOCKED
         is_ds = is_data_steward(auth_context)
         if not is_ds and not (
-            changed_fields == {"state": "locked"}
-            and box.state == ResearchDataUploadBoxState.OPEN
+            changed_fields == {"state": "locked"} and box.state == "open"
         ):
             raise self.BoxAccessError("Unauthorized")
 
         # If locking or unlocking, communicate with service that owns file upload boxes
         #  (errors handled in file_upload_box_client)
-        if (
-            updated_box.state
-            and updated_box.state != box.state
-            and box.state == ResearchDataUploadBoxState.OPEN
-        ):
+        if updated_box.state and updated_box.state != box.state and box.state == "open":
             await self._file_upload_box_client.lock_file_upload_box(
                 box_id=box.file_upload_box_id
             )
             updated_box.locked = True
         elif (
             updated_box.state
-            and updated_box.state == ResearchDataUploadBoxState.OPEN
+            and updated_box.state == "open"
             and updated_box.state != box.state
         ):
             await self._file_upload_box_client.unlock_file_upload_box(
@@ -285,7 +277,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         *,
         box_id: UUID4,
         auth_context: AuthContext,
-    ) -> list[FileUpload]:
+    ) -> list[FileUploadWithAccession]:
         """Get list of file uploads for a research data upload box.
 
         Returns a list of file uploads in the upload box

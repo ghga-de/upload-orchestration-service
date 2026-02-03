@@ -23,7 +23,7 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
-from ghga_event_schemas.pydantic_ import FileUploadBox, ResearchDataUploadBox
+from ghga_event_schemas.pydantic_ import FileUploadBox
 from ghga_service_commons.auth.context import AuthContext
 from hexkit.providers.testing.dao import BaseInMemDao, new_mock_dao_class
 from hexkit.utils import now_utc_ms_prec
@@ -49,7 +49,7 @@ USER1_AUTH_CONTEXT = Mock(spec=AuthContext)
 USER1_AUTH_CONTEXT.id = str(TEST_USER_ID1)
 USER1_AUTH_CONTEXT.roles = []
 
-InMemBoxDao = new_mock_dao_class(dto_model=ResearchDataUploadBox, id_field="id")
+InMemBoxDao = new_mock_dao_class(dto_model=models.ResearchDataUploadBox, id_field="id")
 InMemAccessionMapDao = new_mock_dao_class(dto_model=models.AccessionMap, id_field="id")
 
 
@@ -58,7 +58,7 @@ class JointRig:
     """Test fixture containing all components needed for controller testing."""
 
     config: Config
-    box_dao: BaseInMemDao[ResearchDataUploadBox]
+    box_dao: BaseInMemDao[models.ResearchDataUploadBox]
     accession_map_dao: BaseInMemDao[models.AccessionMap]
     file_upload_box_client: FileBoxClientPort
     access_client: AccessClientPort
@@ -80,7 +80,7 @@ def rig(config: ConfigFixture) -> JointRig:
 
     controller = UploadOrchestrator(
         box_dao=(box_dao := InMemBoxDao()),  # type: ignore
-        accession_map_dao=(accession_map_dao := InMemAccessionMapDao()),
+        accession_map_dao=(accession_map_dao := InMemAccessionMapDao()),  # type: ignore
         file_upload_box_client=file_box_client_mock,
         access_client=access_client_mock,
         audit_repository=AsyncMock(),
@@ -216,7 +216,7 @@ async def test_get_upload_box_files_happy(rig: JointRig, populated_boxes: list[U
     """Test the normal path of getting a list of FileUpload objects for a box from the file box service."""
     # Mock the file box client to return a list of FileUpload objects
     test_file_uploads = [
-        models.FileUpload(
+        models.FileUploadWithAccession(
             id=uuid4(),
             box_id=TEST_FILE_UPLOAD_BOX_ID,
             storage_alias="HD01",

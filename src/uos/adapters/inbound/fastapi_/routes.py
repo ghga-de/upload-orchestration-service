@@ -21,7 +21,6 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
-from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from pydantic import UUID4, NonNegativeInt
 
 from uos.adapters.inbound.fastapi_.auth import StewardAuthContext, UserAuthContext
@@ -37,9 +36,10 @@ from uos.core.models import (
     AccessionMap,
     BoxRetrievalResults,
     CreateUploadBoxRequest,
-    FileUpload,
+    FileUploadWithAccession,
     GrantAccessRequest,
     GrantWithBoxInfo,
+    ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
@@ -368,10 +368,10 @@ async def get_upload_access_grants(  # noqa: PLR0913
     summary="List files in upload box",
     description="List the details of all files uploads for a research data upload box.",
     tags=TAGS,
-    response_model=list[FileUpload],
+    response_model=list[FileUploadWithAccession],
     responses={
         200: {
-            "model": list[FileUpload],
+            "model": list[FileUploadWithAccession],
             "description": "File upload information successfully retrieved.",
         },
         401: {"description": "Access denied."},
@@ -383,7 +383,7 @@ async def list_upload_box_files(
     box_id: UUID,
     upload_service: UploadOrchestratorDummy,
     auth_context: UserAuthContext,
-) -> list[FileUpload]:
+) -> list[FileUploadWithAccession]:
     """List file uploads in an upload box."""
     try:
         file_uploads = await upload_service.get_upload_box_files(

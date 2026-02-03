@@ -20,7 +20,6 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from ghga_event_schemas.pydantic_ import ResearchDataUploadBoxState
 from ghga_service_commons.auth.ghga import AuthContext
 from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
@@ -184,7 +183,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert updated_box.size == 1024000
 
     # 6. Setting the state to LOCKED
-    lock_request = UpdateUploadBoxRequest(state=ResearchDataUploadBoxState.LOCKED)
+    lock_request = UpdateUploadBoxRequest(state="locked")
     httpx_mock.add_response(
         method="PATCH",
         url=f"{file_box_service_url}/boxes/{file_upload_box_id}",
@@ -201,4 +200,4 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         box_id=box_id,
         auth_context=user_auth_context,
     )
-    assert final_box.state == ResearchDataUploadBoxState.LOCKED
+    assert final_box.state == "locked"

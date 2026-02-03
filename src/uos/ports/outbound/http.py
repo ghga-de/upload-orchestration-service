@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
-from uos.core.models import FileUpload, UploadGrant
+from uos.core.models import FileUploadWithAccession, UploadGrant
 
 
 class AccessClientPort(ABC):
@@ -130,7 +130,9 @@ class FileBoxClientPort(ABC):
         ...
 
     @abstractmethod
-    async def get_file_upload_list(self, *, box_id: UUID4) -> list[FileUpload]:
+    async def get_file_upload_list(
+        self, *, box_id: UUID4
+    ) -> list[FileUploadWithAccession]:
         """Get list of file uploads in a FileUploadBox.
 
         Raises:

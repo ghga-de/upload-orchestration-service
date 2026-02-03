@@ -15,10 +15,9 @@
 
 """DAO Port definition"""
 
-from ghga_event_schemas.pydantic_ import ResearchDataUploadBox
 from hexkit.protocols.dao import Dao
 
-from uos.core.models import AccessionMap
+from uos.core.models import AccessionMap, ResearchDataUploadBox
 
 __all__ = ["AccessionMapDao", "BoxDao"]
 

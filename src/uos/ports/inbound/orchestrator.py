@@ -17,7 +17,7 @@
 
 from abc import ABC, abstractmethod
 
-from ghga_event_schemas.pydantic_ import FileUploadBox, ResearchDataUploadBox
+from ghga_event_schemas.pydantic_ import FileUploadBox
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
@@ -25,8 +25,9 @@ from pydantic import UUID4
 from uos.core.models import (
     AccessionMap,
     BoxRetrievalResults,
-    FileUpload,
+    FileUploadWithAccession,
     GrantWithBoxInfo,
+    ResearchDataUploadBox,
     UpdateUploadBoxRequest,
 )
 
@@ -147,7 +148,7 @@ class UploadOrchestratorPort(ABC):
         *,
         box_id: UUID4,
         auth_context: AuthContext,
-    ) -> list[FileUpload]:
+    ) -> list[FileUploadWithAccession]:
         """Get list of file uploads for a research data upload box.
 
         Returns a list of file uploads in the upload box
