@@ -23,7 +23,6 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
-from ghga_event_schemas.pydantic_ import FileUploadBox
 from ghga_service_commons.auth.context import AuthContext
 from hexkit.providers.testing.dao import BaseInMemDao, new_mock_dao_class
 from hexkit.utils import now_utc_ms_prec
@@ -132,8 +131,8 @@ async def test_create_research_data_upload_box(rig: JointRig):
     assert box.size == 0
     assert isinstance(box.file_upload_box_id, UUID)
     assert box.last_changed - now_utc_ms_prec() < timedelta(seconds=5)
-    assert box.locked == False
     assert box.state == "open"
+    assert box.file_upload_box_state == "open"
 
 
 async def test_update_research_data_upload_box_happy(
@@ -299,13 +298,16 @@ async def test_upsert_file_upload_box_happy(rig: JointRig, populated_boxes: list
     initial_box = await rig.box_dao.get_by_id(box_id)
     assert initial_box.file_count == 0
     assert initial_box.size == 0
-    assert initial_box.locked == False
+    assert initial_box.version == 0
+    assert initial_box.file_upload_box_version == 0
+    assert initial_box.file_upload_box_state == "open"
     file_upload_box_id = initial_box.file_upload_box_id
 
     # Create a FileUploadBox with updated data
-    updated_file_upload_box = FileUploadBox(
+    updated_file_upload_box = models.FileUploadBox(
         id=file_upload_box_id,  # This should match the file_upload_box_id in our research box
-        locked=True,
+        version=1,
+        state="locked",
         file_count=5,
         size=1024000,
         storage_alias="HD01",
@@ -316,9 +318,11 @@ async def test_upsert_file_upload_box_happy(rig: JointRig, populated_boxes: list
 
     # Verify the research data upload box was updated
     updated_box = await rig.box_dao.get_by_id(box_id)
+    assert updated_box.version == 1
     assert updated_box.file_count == 5
     assert updated_box.size == 1024000
-    assert updated_box.locked == True
+    assert updated_box.file_upload_box_version == 1
+    assert updated_box.file_upload_box_state == "locked"
 
     # Verify other fields remain unchanged
     assert updated_box.title == "Box A"
@@ -329,9 +333,10 @@ async def test_upsert_file_upload_box_happy(rig: JointRig, populated_boxes: list
 async def test_upsert_file_upload_box_not_found(rig: JointRig):
     """Test the edge case where a matching Research Data Upload Box doesn't exist."""
     # Create a FileUploadBox with a random ID
-    orphaned_file_upload_box = FileUploadBox(
+    orphaned_file_upload_box = models.FileUploadBox(
         id=uuid4(),
-        locked=False,
+        version=0,
+        state="open",
         file_count=3,
         size=512000,
         storage_alias="HD02",
@@ -590,15 +595,15 @@ async def test_get_boxes_sorting(rig: JointRig, populated_boxes: list[UUID]):
 
     # Filter by locked
     locked_results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=True
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, state="locked"
     )
     assert locked_results.count == 2
     locked_results_ids = [box.id for box in locked_results.boxes]
     assert locked_results_ids == [populated_boxes[3], populated_boxes[1]]
 
-    # Filter by unlocked
+    # Filter by open
     unlocked_results = await rig.controller.get_research_data_upload_boxes(
-        auth_context=DATA_STEWARD_AUTH_CONTEXT, locked=False
+        auth_context=DATA_STEWARD_AUTH_CONTEXT, state="open"
     )
     assert unlocked_results.count == 3
     unlocked_results_ids = [box.id for box in unlocked_results.boxes]

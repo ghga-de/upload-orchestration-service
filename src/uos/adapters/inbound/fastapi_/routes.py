@@ -41,6 +41,7 @@ from uos.core.models import (
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
+    UploadBoxState,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
@@ -97,10 +98,10 @@ async def get_research_data_upload_boxes(
             description="Maximum number of research data upload boxes to return",
         ),
     ] = None,
-    locked: Annotated[
-        bool | None,
+    state: Annotated[
+        UploadBoxState | None,
         Query(
-            description="Filter by locked status. None returns both locked and unlocked boxes.",
+            description="Filter by state. None returns all boxes.",
         ),
     ] = None,
 ) -> BoxRetrievalResults:
@@ -114,7 +115,7 @@ async def get_research_data_upload_boxes(
             auth_context=auth_context,
             skip=skip,
             limit=limit,
-            locked=locked,
+            state=state,
         )
         return results
     except Exception as err:
@@ -191,6 +192,39 @@ async def create_research_data_upload_box(
     except Exception as err:
         log.error(err, exc_info=True)
         raise HttpInternalError(message="Failed to create upload box") from err
+
+
+@router.post(
+    "/rpc/archive/{box_id}",
+    summary="Archive an upload box",
+    description="Archives the specified upload box. The box may no longer be modified,"
+    + " and files in the box will be moved to permanent storage. The request body must"
+    + " include the complete accession map, which is used for confirmation and thus"
+    + " cannot include any updates. If the submitted accession map does not match"
+    + " what's in the database, if any files have not been successfully re-encrypted,"
+    + " if the upload box is still 'open', or if there are any files which do not have"
+    + " an assigned accession number, archival will be denied. Only Data Stewards may"
+    + " perform this operation.",
+    tags=TAGS,
+    response_model=None,
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {"description": "Upload box archival successfully initiated."},
+        403: {"description": "Access denied."},
+        404: {"description": "Upload box not found."},
+        409: {"description": "Accession map does not match database."},
+        422: {"description": "Validation error in request body."},
+    },
+)
+@TRACER.start_as_current_span("routes.archive_research_data_upload_box")
+async def archive_research_data_upload_box(
+    box_id: UUID4,
+    request: AccessionMap,
+    upload_service: UploadOrchestratorDummy,
+    auth_context: StewardAuthContext,
+) -> None:
+    """Archive a ResearchDataUploadBox"""
+    pass  # TODO: fill out
 
 
 @router.patch(
@@ -423,7 +457,6 @@ async def submit_accession_map(
     """Update a ResearchDataUploadBox."""
     try:
         await upload_service.update_accession_map(accession_map=request)
-        # TODO: either change request name or use Request object
     except UploadOrchestratorPort.AccessionMapError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
     except UploadOrchestratorPort.BoxNotFoundError as err:

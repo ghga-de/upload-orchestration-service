@@ -102,6 +102,9 @@ class FileBoxClientPort(ABC):
     class OperationError(RuntimeError):
         """Raised when there's an error while communicating with the service"""
 
+    class VersionError(RuntimeError):
+        """Raised when the requested version of a FileUploadBox is out of date."""
+
     @abstractmethod
     async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
         """Create a new FileUploadBox in owning service.
@@ -137,5 +140,15 @@ class FileBoxClientPort(ABC):
 
         Raises:
             OperationError if there's a problem with the operation.
+        """
+        ...
+
+    @abstractmethod
+    async def archive_file_upload_box(self, *, box_id: UUID4, version: int) -> None:
+        """Archive a FileUploadBox in the owning service.
+
+        Raises:
+            VersionError if the remote box version differs from `version`.
+            OperationError if there's any other problem with the operation.
         """
         ...

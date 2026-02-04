@@ -48,6 +48,7 @@ async def get_box_dao(
         autopublish=True,
         dto_to_event=_dto_to_event,
         event_topic=config.research_data_upload_box_topic,
+        indexes=[MongoDbIndex(fields="file_upload_box_id")],
     )
 
 

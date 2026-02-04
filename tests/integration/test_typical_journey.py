@@ -25,9 +25,7 @@ from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
-from uos.core.models import (
-    UpdateUploadBoxRequest,
-)
+from uos.core.models import UpdateUploadBoxRequest
 
 pytestmark = pytest.mark.asyncio()
 
@@ -145,7 +143,8 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     # 4. Receiving a FileUploadBox update event from kafka (which belongs to the box)
     file_upload_box_event: dict[str, Any] = {
         "id": str(file_upload_box_id),
-        "locked": False,
+        "version": 3,
+        "state": "open",
         "file_count": 3,
         "size": 1024000,
         "storage_alias": "test-storage",
@@ -179,6 +178,8 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     )
     assert updated_box.title == "Updated Test Box"
     assert updated_box.description == "Updated description"
+    assert updated_box.version == 1
+    assert updated_box.file_upload_box_version == 3
     assert updated_box.file_count == 3
     assert updated_box.size == 1024000
 

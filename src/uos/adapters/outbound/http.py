@@ -376,3 +376,39 @@ class FileBoxClient(FileBoxClientPort):
             msg = "Failed to extract list of file IDs from response body."
             log.error(msg, exc_info=True)
             raise self.OperationError(msg) from err
+
+    async def archive_file_upload_box(self, *, box_id: UUID4, version: int) -> None:
+        """Archive a FileUploadBox in the owning service.
+
+        Raises:
+            VersionError if the remote box version differs from `version`.
+            OperationError if there's any other problem with the operation.
+        """
+        wot = ChangeFileBoxWorkOrder(work_type="archive", box_id=box_id)
+        headers = self._auth_header(wot)
+        body = {"version": version}
+        response = httpx.patch(
+            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+        )
+        if response.status_code == 409:
+            log.error(
+                "Failed to archive FileUploadBox %s because the version specified"
+                + " in the request is out of date.",
+                box_id,
+                extra={
+                    "box_id": box_id,
+                    "version": version,
+                    "response_text": response.text,
+                },
+            )
+            raise self.VersionError("Requested FileUploadBox version is out of date.")
+        elif response.status_code != 204:
+            log.error(
+                "Error archiving FileUploadBox ID %s in external service.",
+                box_id,
+                extra={
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                },
+            )
+            raise self.OperationError("Failed to archive FileUploadBox.")

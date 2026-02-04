@@ -32,7 +32,8 @@ UPSERTED = "upserted"
 TEST_FILE_UPLOAD_BOX_ID = UUID("f139ab68-56cc-4ca1-8866-2ffc8f297728")
 TEST_PAYLOAD: dict[str, Any] = {
     "id": str(TEST_FILE_UPLOAD_BOX_ID),
-    "locked": False,
+    "version": 0,
+    "state": "open",
     "file_count": 0,
     "size": 0,
     "storage_alias": "test-alias",

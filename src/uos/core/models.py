@@ -39,7 +39,10 @@ class ResearchDataUploadBox(BaseModel):
         default_factory=uuid4,
         description="Unique identifier for the research data upload box",
     )
-    state: UploadBoxState = Field(..., description="Current state of the upload box")
+    version: int = Field(..., description="A counter indicating resource version")
+    state: UploadBoxState = Field(
+        ..., description="Current state of the research data upload box"
+    )
     title: str = Field(..., description="Short meaningful name for the box")
     description: str = Field(..., description="Describes the upload box in more detail")
     last_changed: UTCDatetime = Field(..., description="Timestamp of the latest change")
@@ -47,12 +50,26 @@ class ResearchDataUploadBox(BaseModel):
         ..., description="ID of the user who performed the latest change"
     )
     file_upload_box_id: UUID4 = Field(..., description="The ID of the file upload box.")
-    locked: bool = Field(
-        default=False,
-        description="Whether or not changes to the files in the file upload box are allowed",
+    file_upload_box_version: int = Field(
+        ..., description="A counter indicating resource version"
+    )
+    # TODO: shorten id field name to fub_id
+    file_upload_box_state: UploadBoxState = Field(
+        ..., description="Current state of the file upload box"
     )
     file_count: int = Field(default=0, description="The number of files in the box")
     size: int = Field(default=0, description="The total size of all files in the box")
+    storage_alias: str = Field(..., description="S3 storage alias to use for uploads")
+
+
+class FileUploadBox(BaseModel):
+    """A class representing a FileUploadBox"""
+
+    id: UUID4 = Field(..., description="The ID of the box.")
+    version: int = Field(..., description="A counter indicating resource version")
+    state: UploadBoxState = Field(..., description="Current state of the box")
+    file_count: int = Field(..., description="The number of files in the box")
+    size: int = Field(..., description="The total size of all files in the box")
     storage_alias: str = Field(..., description="S3 storage alias to use for uploads")
 
 
@@ -72,7 +89,7 @@ class CreateFileBoxWorkOrder(BaseWorkOrderToken):
 class ChangeFileBoxWorkOrder(BaseWorkOrderToken):
     """Work order token for changing FileUploadBox state."""
 
-    work_type: Literal["lock", "unlock"]
+    work_type: Literal["lock", "unlock", "archive"]
     box_id: UUID4 = Field(..., description="ID of the box to change")
 
 

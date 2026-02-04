@@ -112,6 +112,7 @@ async def test_get_research_data_upload_box(
 
         # normal response (patch mock)
         box = ResearchDataUploadBox(
+            version=0,
             state="open",
             title="test",
             description="desc",
@@ -119,6 +120,8 @@ async def test_get_research_data_upload_box(
             changed_by=TEST_DS_ID,
             id=TEST_BOX_ID,
             file_upload_box_id=uuid4(),
+            file_upload_box_version=0,
+            file_upload_box_state="open",
             storage_alias="HD",
         )
         orchestrator.get_research_data_upload_box.return_value = box
@@ -536,6 +539,7 @@ async def test_get_boxes(
     # Create test boxes
     test_boxes = [
         ResearchDataUploadBox(
+            version=0,
             id=uuid4(),
             state="open",
             title="Box A",
@@ -543,9 +547,12 @@ async def test_get_boxes(
             last_changed=now_utc_ms_prec(),
             changed_by=TEST_DS_ID,
             file_upload_box_id=uuid4(),
+            file_upload_box_version=0,
+            file_upload_box_state="open",
             storage_alias="HD01",
         ),
         ResearchDataUploadBox(
+            version=0,
             id=uuid4(),
             state="open",
             title="Box B",
@@ -553,6 +560,8 @@ async def test_get_boxes(
             last_changed=now_utc_ms_prec(),
             changed_by=TEST_DS_ID,
             file_upload_box_id=uuid4(),
+            file_upload_box_version=0,
+            file_upload_box_state="open",
             storage_alias="HD01",
         ),
     ]
@@ -595,16 +604,16 @@ async def test_get_boxes(
             count=1, boxes=[locked_box]
         )
         response = await rest_client.get(
-            url, headers=ds_auth_headers, params={"locked": "true"}
+            url, headers=ds_auth_headers, params={"state": "locked"}
         )
         assert response.status_code == 200
         response_data = response.json()
         assert response_data["count"] == 1
         assert len(response_data["boxes"]) == 1
 
-        # Verify orchestrator was called with locked=True
+        # Verify orchestrator was called with state="locked"
         call_args = orchestrator.get_research_data_upload_boxes.call_args
-        assert call_args.kwargs["locked"] is True
+        assert call_args.kwargs["state"] == "locked"
 
         # Test locked=false parameter
         orchestrator.reset_mock()
@@ -613,11 +622,11 @@ async def test_get_boxes(
             count=1, boxes=[unlocked_box]
         )
         response = await rest_client.get(
-            url, headers=ds_auth_headers, params={"locked": "false"}
+            url, headers=ds_auth_headers, params={"state": "open"}
         )
         assert response.status_code == 200
         call_args = orchestrator.get_research_data_upload_boxes.call_args
-        assert call_args.kwargs["locked"] is False
+        assert call_args.kwargs["state"] == "open"
 
         # Test other exception
         orchestrator.reset_mock()

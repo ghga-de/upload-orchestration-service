@@ -76,63 +76,85 @@ components:
       - accession
       title: FileIdToAccession
       type: object
-    FileUpload:
-      description: A File Upload.
+    FileUploadWithAccession:
+      description: A FileUpload with its accession
       properties:
+        accession:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: The accession number assigned to this file.
+          title: Accession
         alias:
-          description: The submitted alias from the metadata (unique within the box)
           title: Alias
           type: string
         box_id:
-          description: The ID of the FileUploadBox this FileUpload belongs to
           format: uuid4
           title: Box Id
           type: string
-        checksum:
-          description: Unencrypted checksum
-          title: Checksum
+        bucket_id:
+          description: The name of the bucket where the file is currently stored
+          title: Bucket Id
           type: string
-        completed:
-          default: false
-          description: Whether or not the file upload has finished
-          title: Completed
-          type: boolean
+        decrypted_sha256:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: SHA-256 checksum of the entire unencrypted file content
+          title: Decrypted Sha256
+        decrypted_size:
+          description: The size of the unencrypted file
+          title: Decrypted Size
+          type: integer
+        encrypted_size:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: The encrypted size of the file before re-encryption
+          title: Encrypted Size
         id:
           description: Unique identifier for the file upload
           format: uuid4
           title: Id
           type: string
-        size:
-          description: File size in bytes
-          title: Size
+        part_size:
+          description: The number of bytes in each file part (last part is likely
+            smaller)
+          title: Part Size
           type: integer
         state:
-          $ref: '#/components/schemas/FileUploadState'
           default: init
           description: The state of the FileUpload
+          enum:
+          - init
+          - inbox
+          - failed
+          - cancelled
+          - interrogated
+          - awaiting_archival
+          - archived
+          title: State
+          type: string
+        state_updated:
+          description: Timestamp of when state was updated
+          format: date-time
+          title: State Updated
+          type: string
+        storage_alias:
+          description: The storage alias of the Data Hub housing the file
+          title: Storage Alias
+          type: string
       required:
       - id
       - box_id
       - alias
-      - checksum
-      - size
-      title: FileUpload
+      - state_updated
+      - storage_alias
+      - bucket_id
+      - decrypted_size
+      - part_size
+      title: FileUploadWithAccession
       type: object
-    FileUploadState:
-      description: 'The allowed states for a ResearchDataUploadBox instance.
-
-
-        init: file upload initiated, but not yet finished
-
-        inbox: file upload complete, file in inbox
-
-        archived: file moved out of inbox after completion'
-      enum:
-      - init
-      - inbox
-      - archived
-      title: FileUploadState
-      type: string
     GrantAccessRequest:
       description: Request model for granting upload access to a user.
       properties:
@@ -255,10 +277,7 @@ components:
       title: HTTPValidationError
       type: object
     ResearchDataUploadBox:
-      description: 'A class representing a ResearchDataUploadBox.
-
-
-        Contains all fields from the FileUploadBox.'
+      description: A class representing a ResearchDataUploadBox.
       properties:
         changed_by:
           description: ID of the user who performed the latest change
@@ -279,6 +298,18 @@ components:
           format: uuid4
           title: File Upload Box Id
           type: string
+        file_upload_box_state:
+          description: Current state of the file upload box
+          enum:
+          - open
+          - locked
+          - archived
+          title: File Upload Box State
+          type: string
+        file_upload_box_version:
+          description: A counter indicating resource version
+          title: File Upload Box Version
+          type: integer
         id:
           description: Unique identifier for the research data upload box
           format: uuid4
@@ -289,20 +320,19 @@ components:
           format: date-time
           title: Last Changed
           type: string
-        locked:
-          default: false
-          description: Whether or not changes to the files in the file upload box
-            are allowed
-          title: Locked
-          type: boolean
         size:
           default: 0
           description: The total size of all files in the box
           title: Size
           type: integer
         state:
-          $ref: '#/components/schemas/ResearchDataUploadBoxState'
-          description: Current state of the upload box
+          description: Current state of the research data upload box
+          enum:
+          - open
+          - locked
+          - archived
+          title: State
+          type: string
         storage_alias:
           description: S3 storage alias to use for uploads
           title: Storage Alias
@@ -311,24 +341,23 @@ components:
           description: Short meaningful name for the box
           title: Title
           type: string
+        version:
+          description: A counter indicating resource version
+          title: Version
+          type: integer
       required:
+      - version
       - state
       - title
       - description
       - last_changed
       - changed_by
       - file_upload_box_id
+      - file_upload_box_version
+      - file_upload_box_state
       - storage_alias
       title: ResearchDataUploadBox
       type: object
-    ResearchDataUploadBoxState:
-      description: The allowed states for a ResearchDataUploadBox instance.
-      enum:
-      - open
-      - locked
-      - closed
-      title: ResearchDataUploadBoxState
-      type: string
     UpdateUploadBoxRequest:
       description: Request model for updating a research data upload box.
       properties:
@@ -340,9 +369,14 @@ components:
           title: Description
         state:
           anyOf:
-          - $ref: '#/components/schemas/ResearchDataUploadBoxState'
+          - enum:
+            - open
+            - locked
+            - archived
+            type: string
           - type: 'null'
           description: Updated state
+          title: State
         title:
           anyOf:
           - type: string
@@ -536,18 +570,20 @@ paths:
           - type: 'null'
           description: Maximum number of research data upload boxes to return
           title: Limit
-      - description: Filter by locked status. None returns both locked and unlocked
-          boxes.
+      - description: Filter by state. None returns all boxes.
         in: query
-        name: locked
+        name: state
         required: false
         schema:
           anyOf:
-          - type: boolean
+          - enum:
+            - open
+            - locked
+            - archived
+            type: string
           - type: 'null'
-          description: Filter by locked status. None returns both locked and unlocked
-            boxes.
-          title: Locked
+          description: Filter by state. None returns all boxes.
+          title: State
       responses:
         '200':
           content:
@@ -705,7 +741,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/FileUpload'
+                  $ref: '#/components/schemas/FileUploadWithAccession'
                 title: Response 200 List Upload Box Files Boxes  Box Id  Uploads Get
                 type: array
           description: File upload information successfully retrieved.
@@ -735,5 +771,46 @@ paths:
               schema: {}
           description: Successful Response
       summary: health
+  /rpc/archive/{box_id}:
+    post:
+      description: Archives the specified upload box. The box may no longer be modified,
+        and files in the box will be moved to permanent storage. The request body
+        must include the complete accession map, which is used for confirmation and
+        thus cannot include any updates. If the submitted accession map does not match
+        what's in the database, if any files have not been successfully re-encrypted,
+        if the upload box is still 'open', or if there are any files which do not
+        have an assigned accession number, archival will be denied. Only Data Stewards
+        may perform this operation.
+      operationId: archive_research_data_upload_box_rpc_archive__box_id__post
+      parameters:
+      - in: path
+        name: box_id
+        required: true
+        schema:
+          format: uuid4
+          title: Box Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessionMap'
+        required: true
+      responses:
+        '204':
+          description: Upload box archival successfully initiated.
+        '403':
+          description: Access denied.
+        '404':
+          description: Upload box not found.
+        '409':
+          description: Accession map does not match database.
+        '422':
+          description: Validation error in request body.
+      security:
+      - HTTPBearer: []
+      summary: Archive an upload box
+      tags:
+      - ResearchDataUploadBoxes
 tags:
 - name: ResearchDataUploadBoxes

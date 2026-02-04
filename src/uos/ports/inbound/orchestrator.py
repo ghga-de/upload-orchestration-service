@@ -17,7 +17,6 @@
 
 from abc import ABC, abstractmethod
 
-from ghga_event_schemas.pydantic_ import FileUploadBox
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
@@ -25,10 +24,12 @@ from pydantic import UUID4
 from uos.core.models import (
     AccessionMap,
     BoxRetrievalResults,
+    FileUploadBox,
     FileUploadWithAccession,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
+    UploadBoxState,
 )
 
 
@@ -53,7 +54,15 @@ class UploadOrchestratorPort(ABC):
             super().__init__(msg)
 
     class AccessionMapError(RuntimeError):
-        """Raised when an accession map includes a file ID that doesn't exist."""
+        """Raised when an operation fails for a reason directly related to the accession map."""
+
+    class ArchivalPrereqsError(RuntimeError):
+        """Raised when the pre-requisites for box archival are not met."""
+
+    class OutdatedInfoError(RuntimeError):
+        """Raised when changes to a resource can't be made because the request
+        references a version of the resource that is not current.
+        """
 
     @abstractmethod
     async def create_research_data_upload_box(
@@ -75,7 +84,7 @@ class UploadOrchestratorPort(ABC):
             The UUID of the newly created research data upload box
 
         Raises:
-            OperationError: if there's a problem creating a corresponding FileUploadBox.
+            OperationError: If there's a problem creating a corresponding FileUploadBox.
         """
         ...
 
@@ -92,7 +101,26 @@ class UploadOrchestratorPort(ABC):
         Raises:
             BoxNotFoundError: If the research data upload box doesn't exist.
             BoxAccessError: If the user doesn't have access to the research data upload box.
-            OperationError: if there's a problem updating the corresponding FileUploadBox.
+            OperationError: If there's a problem updating the corresponding FileUploadBox.
+        """
+        ...
+
+    @abstractmethod
+    async def archive_research_data_upload_box(
+        self,
+        *,
+        box_id: UUID4,
+        version: int,
+        data_steward_id: UUID4,
+    ) -> None:
+        """Archive a research data upload box.
+
+        Raises:
+            BoxNotFoundError: If the research data upload box doesn't exist.
+            OutdatedInfoError: If the box version differs from `version`.
+            ArchivalPrereqsError: If there are any files in the box that don't yet have
+                an accession assigned OR if the box is still in the 'open' state.
+            OperationError: If there's a problem querying the file box service.
         """
         ...
 
@@ -138,7 +166,7 @@ class UploadOrchestratorPort(ABC):
         Results are sorted by validity, user ID, IVA ID, box ID, and grant ID.
 
         Raises:
-            AccessAPIError: if there's a problem communicating with the access API.
+            AccessAPIError: If there's a problem communicating with the access API.
         """
         ...
 
@@ -156,7 +184,7 @@ class UploadOrchestratorPort(ABC):
         Raises:
             BoxNotFoundError: If the box doesn't exist.
             BoxAccessError: If the user doesn't have access to the box.
-            OperationError: if there's a problem querying the file box service.
+            OperationError: If there's a problem querying the file box service.
             AccessAPIError: If there's a problem querying the access api
         """
         ...
@@ -191,15 +219,16 @@ class UploadOrchestratorPort(ABC):
         auth_context: AuthContext,
         skip: int | None = None,
         limit: int | None = None,
-        locked: bool | None = None,
+        state: UploadBoxState | None = None,
     ) -> BoxRetrievalResults:
         """Retrieve all Research Data Upload Boxes, optionally paginated.
 
         For data stewards, returns all boxes. For regular users, only returns boxes
         they have access to according to the Access API.
 
-        Results are sorted first by locked status (unlocked first), then by most
-        recently changed, and then by box ID.
+        Results are sorted first by state ("open" first), then by most
+        recently changed, and then by box ID. Results can also be filtered to show boxes
+        with a chosen state.
 
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """
@@ -214,6 +243,7 @@ class UploadOrchestratorPort(ABC):
         exists in the retrieved list of files. Finally, it stores the mapping in the DB.
 
         Raises:
+            BoxNotFoundError: If the box doesn't exist
             AccessionMapError: If the accession map includes a file ID that doesn't
                 exist or if there are duplicate accessions.
         """

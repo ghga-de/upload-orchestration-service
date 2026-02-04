@@ -18,7 +18,6 @@
 import logging
 from uuid import UUID
 
-from ghga_event_schemas.pydantic_ import FileUploadBox
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from hexkit.protocols.dao import (
@@ -32,10 +31,12 @@ from pydantic import UUID4
 from uos.core.models import (
     AccessionMap,
     BoxRetrievalResults,
+    FileUploadBox,
     FileUploadWithAccession,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
+    UploadBoxState,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.audit import AuditRepositoryPort
@@ -89,7 +90,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
             The UUID of the newly created research data upload box
 
         Raises:
-            OperationError: if there's a problem creating a corresponding FileUploadBox.
+            OperationError: If there's a problem creating a corresponding FileUploadBox.
         """
         # Create FileUploadBox in external service
         file_upload_box_id = await self._file_upload_box_client.create_file_upload_box(
@@ -98,12 +99,15 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Create ResearchDataUploadBox
         box = ResearchDataUploadBox(
+            version=0,
             state="open",
             title=title,
             description=description,
             last_changed=now_utc_ms_prec(),
             changed_by=data_steward_id,
             file_upload_box_id=file_upload_box_id,
+            file_upload_box_version=0,
+            file_upload_box_state="open",
             storage_alias=storage_alias,
         )
 
@@ -124,7 +128,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Raises:
             BoxNotFoundError: If the research data upload box doesn't exist.
             BoxAccessError: If the user doesn't have access to the research data upload box.
-            OperationError: if there's a problem updating the corresponding FileUploadBox.
+            OperationError: If there's a problem updating the corresponding FileUploadBox.
         """
         # Get existing box if user has access to it
         box = await self.get_research_data_upload_box(
@@ -148,16 +152,14 @@ class UploadOrchestrator(UploadOrchestratorPort):
             await self._file_upload_box_client.lock_file_upload_box(
                 box_id=box.file_upload_box_id
             )
-            updated_box.locked = True
+            updated_box.file_upload_box_state = "locked"
         elif (
-            updated_box.state
-            and updated_box.state == "open"
-            and updated_box.state != box.state
+            updated_box.state and updated_box.state == "open" and box.state == "locked"
         ):
             await self._file_upload_box_client.unlock_file_upload_box(
                 box_id=box.file_upload_box_id
             )
-            updated_box.locked = False
+            updated_box.file_upload_box_state = "open"
 
         # Update the research data upload box in the DB
         updated_box.last_changed = now_utc_ms_prec()
@@ -167,6 +169,127 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Create audit record
         await self._audit_repository.log_box_updated(box=updated_box, user_id=user_id)
+
+    async def archive_research_data_upload_box(
+        self,
+        *,
+        box_id: UUID4,
+        version: int,
+        data_steward_id: UUID4,
+    ) -> None:
+        """Archive a research data upload box.
+
+        Raises:
+            BoxNotFoundError: If the research data upload box doesn't exist.
+            OutdatedInfoError: If the box version differs from `version`.
+            ArchivalPrereqsError: If there are any files in the box that don't yet have
+                an accession assigned OR if the box is still in the 'open' state.
+            OperationError: If there's a problem querying the file box service.
+        """
+        # Get RDUB
+        try:
+            box = await self._box_dao.get_by_id(box_id)
+        except ResourceNotFoundError as err:
+            raise self.BoxNotFoundError(box_id=box_id) from err
+
+        # Return early (with a log) if the box has already been archived
+        if box.state == "archived":
+            log.warning(
+                "RDUB %s has already been archived.",
+                box_id,
+                extra={"box_id": box_id, "version": version},
+            )
+            return
+
+        # Make sure the request is not based on outdated info
+        if box.version != version:
+            log.error(
+                "Can't archive RDUB %s because the request is outdated.",
+                box_id,
+                extra={
+                    "box_id": box_id,
+                    "box_version": box.version,
+                    "request_version": version,
+                },
+            )
+            raise self.OutdatedInfoError(
+                f"Research Data Upload Box {box_id} has changed"
+            )
+
+        # Make sure the box is locked
+        if box.state != "locked":
+            log.error(
+                "Can't archive RDUB %s because it's still open.",
+                box_id,
+                extra={"box_id": box_id, "version": version},
+            )
+            raise self.ArchivalPrereqsError("Box must be locked before archival.")
+
+        try:
+            db_map = await self._accession_map_dao.get_by_id(box_id)
+        except ResourceNotFoundError as err:
+            log.error(
+                "Can't archive RDUB %s because no accession map could be found.",
+                box_id,
+                extra={"box_id": box_id, "version": version},
+            )
+            raise self.ArchivalPrereqsError(
+                "Accessions have not been assigned"
+            ) from err
+
+        # Get files list from File Box API
+        files = await self._file_upload_box_client.get_file_upload_list(
+            box_id=box.file_upload_box_id
+        )
+
+        # Make sure all files have an accession number
+        file_ids_in_box = set(f.id for f in files)
+        file_ids_in_map = set(mapping.file_id for mapping in db_map.mappings)
+        unassigned_files = file_ids_in_box - file_ids_in_map
+
+        if unassigned_files:
+            log.error(
+                "Can't archive RDUB %s because not all files have been assigned an accession.",
+                box_id,
+                extra={
+                    "box_id": box_id,
+                    "version": version,
+                    "file_ids": unassigned_files,
+                },
+            )
+            raise self.ArchivalPrereqsError(
+                f"The following files are missing an accession: {unassigned_files}"
+            )
+
+        # Trigger the FileUploadBox archival
+        try:
+            await self._file_upload_box_client.archive_file_upload_box(
+                box_id=box.file_upload_box_id, version=box.file_upload_box_version
+            )
+        except FileBoxClientPort.VersionError as version_err:
+            log.error(
+                "Can't archive RDUB %s because the associated FileUploadBox version has changed.",
+                box_id,
+                extra={
+                    "box_id": box_id,
+                    "file_upload_box_version": box.file_upload_box_version,
+                },
+            )
+            raise self.OutdatedInfoError(
+                f"File Upload Box {box.file_upload_box_id} has changed."
+            ) from version_err
+
+        # Update box attributes
+        box.version += 1
+        box.state = "archived"
+        box.last_changed = now_utc_ms_prec()
+        box.changed_by = data_steward_id
+        box.file_upload_box_version += 1
+        box.file_upload_box_state = "archived"
+        await self._box_dao.update(box)
+
+        # Publish audit event
+        await self._audit_repository.log_box_updated(box=box, user_id=data_steward_id)
 
     async def grant_upload_access(  # noqa: PLR0913
         self,
@@ -226,7 +349,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Results are sorted by validity, user ID, IVA ID, box ID, and grant ID.
 
         Raises:
-            AccessAPIError: if there's a problem communicating with the access API.
+            AccessAPIError: If there's a problem communicating with the access API.
         """
         grants = await self._access_client.get_upload_access_grants(
             user_id=user_id,
@@ -272,6 +395,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
             ),
         )
 
+    # TODO: Add flag for retrieving files minus cancelled and failed files
     async def get_upload_box_files(
         self,
         *,
@@ -285,7 +409,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Raises:
             BoxNotFoundError: If the box doesn't exist.
             BoxAccessError: If the user doesn't have access to the box.
-            OperationError: if there's a problem querying the file box service.
+            OperationError: If there's a problem querying the file box service.
             AccessAPIError: If there's a problem querying the access api
         """
         # Verify access
@@ -324,14 +448,17 @@ class UploadOrchestrator(UploadOrchestratorPort):
             )
             # Get the fields that matter (ID and storage alias don't change)
             new = {
-                "locked": file_upload_box.locked,
+                "file_upload_box_version": file_upload_box.version,
+                "file_upload_box_state": file_upload_box.state,
                 "file_count": file_upload_box.file_count,
                 "size": file_upload_box.size,
+                "storage_alias": file_upload_box.storage_alias,
             }
             updated_model = research_data_upload_box.model_copy(update=new)
 
             # Conditionally update data
             if updated_model.model_dump() != research_data_upload_box.model_dump():
+                updated_model.version += 1
                 await self._box_dao.update(updated_model)
         except NoHitsFoundError:
             # This might happen during initial creation - ignore
@@ -388,15 +515,16 @@ class UploadOrchestrator(UploadOrchestratorPort):
         auth_context: AuthContext,
         skip: int | None = None,
         limit: int | None = None,
-        locked: bool | None = None,
+        state: UploadBoxState | None = None,
     ) -> BoxRetrievalResults:
         """Retrieve all Research Data Upload Boxes, optionally paginated.
 
         For data stewards, returns all boxes. For regular users, only returns boxes
         they have access to according to the Access API.
 
-        Results are sorted first by locked status (unlocked first), then by most
-        recently changed, and then by box ID.
+        Results are sorted first by state ("open" first), then by most
+        recently changed, and then by box ID. Results can also be filtered to show boxes
+        with a chosen state.
 
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """
@@ -411,8 +539,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # Check if user is a data steward
         is_ds = is_data_steward(auth_context)
 
-        # Filter by locked status if specified
-        mapping = {"locked": locked} if locked is not None else {}
+        # Filter by state if specified
+        mapping = {"state": state} if state is not None else {}
 
         if is_ds:
             # Data stewards can see all boxes
@@ -428,13 +556,13 @@ class UploadOrchestrator(UploadOrchestratorPort):
             boxes = [
                 await self._box_dao.get_by_id(box_id) for box_id in accessible_box_ids
             ]
-            if locked is not None:
-                boxes = [x for x in boxes if x.locked == locked]
+            if state is not None:
+                boxes = [x for x in boxes if x.state == state]
 
         count = len(boxes)
         boxes.sort(
             key=lambda x: (
-                x.locked,  # sort so unlocked are first, locked last (False < True)
+                tuple(-ord(c) for c in x.state),  # Reverse alphabetical
                 -x.last_changed.timestamp(),  # DESC by last_changed
                 x.id,  # ASC by ID
             )
@@ -460,6 +588,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
             AccessionMapError: If the accession map includes a file ID that doesn't
                 exist or if there are duplicate accessions.
         """
+        # TODO: Decide if this should require version number or not
         # Make sure the box exists
         box_id = accession_map.box_id
         try:
@@ -476,6 +605,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
         files = await self._file_upload_box_client.get_file_upload_list(
             box_id=box.file_upload_box_id
         )
+
+        files = [f for f in files if f.state not in ("cancelled", "failed")]
         file_ids_in_box = set(f.id for f in files)
         file_ids_in_map = set(mapping.file_id for mapping in accession_map.mappings)
         invalid_ids = file_ids_in_map - file_ids_in_box
