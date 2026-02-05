@@ -14,6 +14,9 @@
 # limitations under the License.
 """Set up session-scope fixtures for tests."""
 
+from collections.abc import AsyncGenerator
+
+import httpx
 import pytest
 import pytest_asyncio
 from ghga_service_commons.utils import jwt_helpers
@@ -50,3 +53,10 @@ def config_fixture() -> ConfigFixture:
 async def cid_fixture():  # noqa: D103
     async with set_new_correlation_id() as cid:
         yield cid
+
+
+@pytest_asyncio.fixture()
+async def httpx_client() -> AsyncGenerator[httpx.AsyncClient]:
+    """Yields an AsyncClient"""
+    async with httpx.AsyncClient() as client:
+        yield client

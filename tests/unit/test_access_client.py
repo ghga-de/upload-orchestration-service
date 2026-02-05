@@ -35,9 +35,11 @@ VALID_FROM = now_utc_ms_prec() - timedelta(minutes=5)
 VALID_UNTIL = VALID_FROM + timedelta(minutes=5)
 
 
-async def test_grant_upload_access(config: ConfigFixture, httpx_mock: HTTPXMock):
+async def test_grant_upload_access(
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
+):
     """Test the grant_upload_access function"""
-    access_client = AccessClient(config=config.config)
+    access_client = AccessClient(config=config.config, httpx_client=httpx_client)
 
     # Happy path
     httpx_mock.add_response(200)
@@ -84,10 +86,10 @@ async def test_grant_upload_access(config: ConfigFixture, httpx_mock: HTTPXMock)
 
 
 async def test_get_accessible_upload_boxes(
-    config: ConfigFixture, httpx_mock: HTTPXMock
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
 ):
     """Test the get_accessible_upload_boxes function"""
-    access_client = AccessClient(config=config.config)
+    access_client = AccessClient(config=config.config, httpx_client=httpx_client)
 
     # Happy path with multiple boxes
     some_datetime = now_utc_ms_prec().isoformat()
@@ -127,9 +129,11 @@ async def test_get_accessible_upload_boxes(
         await access_client.get_accessible_upload_boxes(user_id=TEST_USER_ID)
 
 
-async def test_check_box_access(config: ConfigFixture, httpx_mock: HTTPXMock):
+async def test_check_box_access(
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
+):
     """Test the check_box_access function"""
-    access_client = AccessClient(config=config.config)
+    access_client = AccessClient(config=config.config, httpx_client=httpx_client)
 
     # Happy path - user has access
     httpx_mock.add_response(200)

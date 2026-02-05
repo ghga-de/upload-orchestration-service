@@ -18,6 +18,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
 
+import httpx
 from fastapi import FastAPI
 from ghga_service_commons.auth.ghga import AuthContext, GHGAAuthContextProvider
 from hexkit.providers.akafka.provider import (
@@ -83,6 +84,7 @@ async def prepare_core(*, config: Config) -> AsyncGenerator[UploadOrchestratorPo
         get_persistent_publisher(
             config=config, dao_factory=dao_factory
         ) as persistent_pub_provider,
+        httpx.AsyncClient() as httpx_client,
     ):
         event_publisher = EventPubTranslator(
             config=config, provider=persistent_pub_provider
@@ -94,8 +96,8 @@ async def prepare_core(*, config: Config) -> AsyncGenerator[UploadOrchestratorPo
             config=config, dao_publisher_factory=dao_publisher_factory
         )
         accession_map_dao = await get_accession_map_dao(dao_factory=dao_factory)
-        access_client = AccessClient(config=config)
-        file_upload_box_client = FileBoxClient(config=config)
+        access_client = AccessClient(config=config, httpx_client=httpx_client)
+        file_upload_box_client = FileBoxClient(config=config, httpx_client=httpx_client)
 
         yield UploadOrchestrator(
             box_dao=box_dao,

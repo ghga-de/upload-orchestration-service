@@ -25,6 +25,7 @@ from jwcrypto import jwk
 from pydantic import UUID4, Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings
 
+from uos.constants import HTTPX_TIMEOUT
 from uos.core.models import (
     BaseWorkOrderToken,
     ChangeFileBoxWorkOrder,
@@ -35,8 +36,6 @@ from uos.core.models import (
 )
 from uos.core.tokens import sign_work_order_token
 from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
-
-TIMEOUT = 60
 
 log = logging.getLogger(__name__)
 
@@ -70,8 +69,9 @@ class FileBoxClientConfig(BaseSettings):
 class AccessClient(AccessClientPort):
     """An adapter for interacting with the access API to manage upload access grants"""
 
-    def __init__(self, *, config: AccessApiConfig):
+    def __init__(self, *, config: AccessApiConfig, httpx_client: httpx.AsyncClient):
         self._access_url = config.access_url
+        self._client = httpx_client
 
     async def grant_upload_access(
         self,
@@ -96,7 +96,7 @@ class AccessClient(AccessClientPort):
             "valid_until": valid_until.isoformat(),
         }
 
-        response = httpx.post(url, json=body)
+        response = await self._client.post(url, json=body, timeout=HTTPX_TIMEOUT)
         if response.status_code != 200:
             log.error(
                 "Failed to grant upload access for user %s to box %s.",
@@ -122,7 +122,7 @@ class AccessClient(AccessClientPort):
             AccessAPIError: if there's a problem during the operation.
         """
         url = f"{self._access_url}/upload-access/grants/{grant_id}"
-        response = httpx.delete(url)
+        response = await self._client.delete(url, timeout=HTTPX_TIMEOUT)
         if response.status_code == 204:
             return
 
@@ -161,7 +161,7 @@ class AccessClient(AccessClientPort):
         }
 
         url = f"{self._access_url}/upload-access/grants"
-        response = httpx.get(url, params=params)
+        response = await self._client.get(url, params=params, timeout=HTTPX_TIMEOUT)
         if response.status_code != 200:
             msg = "Failed to retrieve upload access grants."
             log.error(
@@ -189,7 +189,7 @@ class AccessClient(AccessClientPort):
             AccessAPIError: if there's a problem during the operation.
         """
         url = f"{self._access_url}/upload-access/users/{user_id}/boxes"
-        response = httpx.get(url)
+        response = await self._client.get(url, timeout=HTTPX_TIMEOUT)
         status_code = response.status_code
         if status_code == httpx.codes.NOT_FOUND:
             return []
@@ -221,7 +221,7 @@ class AccessClient(AccessClientPort):
         url = f"{self._access_url}/upload-access/users/{user_id}/boxes/{box_id}"
 
         try:
-            response = httpx.get(url)
+            response = await self._client.get(url, timeout=HTTPX_TIMEOUT)
 
             # 200 means user has access, 403/404 means no access
             if response.status_code == 200:
@@ -258,8 +258,9 @@ class FileBoxClient(FileBoxClientPort):
     This class is responsible for WOT generation and all pertinent error handling.
     """
 
-    def __init__(self, *, config: FileBoxClientConfig):
+    def __init__(self, *, config: FileBoxClientConfig, httpx_client: httpx.AsyncClient):
         self._ucs_url = config.ucs_url
+        self._client = httpx_client
         self._signing_key = jwk.JWK.from_json(
             config.work_order_signing_key.get_secret_value()
         )
@@ -281,7 +282,9 @@ class FileBoxClient(FileBoxClientPort):
         """
         headers = self._auth_header(CreateFileBoxWorkOrder())
         body = {"storage_alias": storage_alias}
-        response = httpx.post(f"{self._ucs_url}/boxes", headers=headers, json=body)
+        response = await self._client.post(
+            f"{self._ucs_url}/boxes", headers=headers, json=body, timeout=HTTPX_TIMEOUT
+        )
         if response.status_code != 201:
             log.error(
                 "Error creating new FileUploadBox in external service with storage alias %s.",
@@ -309,8 +312,11 @@ class FileBoxClient(FileBoxClientPort):
         wot = ChangeFileBoxWorkOrder(work_type="lock", box_id=box_id)
         headers = self._auth_header(wot)
         body = {"lock": True}
-        response = httpx.patch(
-            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+        response = await self._client.patch(
+            f"{self._ucs_url}/boxes/{box_id}",
+            headers=headers,
+            json=body,
+            timeout=HTTPX_TIMEOUT,
         )
         if response.status_code != 204:
             log.error(
@@ -333,8 +339,11 @@ class FileBoxClient(FileBoxClientPort):
 
         headers = self._auth_header(wot)
         body = {"lock": False}
-        response = httpx.patch(
-            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+        response = await self._client.patch(
+            f"{self._ucs_url}/boxes/{box_id}",
+            headers=headers,
+            json=body,
+            timeout=HTTPX_TIMEOUT,
         )
         if response.status_code != 204:
             log.error(
@@ -357,7 +366,11 @@ class FileBoxClient(FileBoxClientPort):
         """
         wot = ViewFileBoxWorkOrder(box_id=box_id)
         headers = self._auth_header(wot)
-        response = httpx.get(f"{self._ucs_url}/boxes/{box_id}/uploads", headers=headers)
+        response = await self._client.get(
+            f"{self._ucs_url}/boxes/{box_id}/uploads",
+            headers=headers,
+            timeout=HTTPX_TIMEOUT,
+        )
         if response.status_code != 200:
             log.error(
                 "Error unlocking FileUploadBox ID %s in external service.",
@@ -387,8 +400,11 @@ class FileBoxClient(FileBoxClientPort):
         wot = ChangeFileBoxWorkOrder(work_type="archive", box_id=box_id)
         headers = self._auth_header(wot)
         body = {"version": version}
-        response = httpx.patch(
-            f"{self._ucs_url}/boxes/{box_id}", headers=headers, json=body
+        response = await self._client.patch(
+            f"{self._ucs_url}/boxes/{box_id}",
+            headers=headers,
+            json=body,
+            timeout=HTTPX_TIMEOUT,
         )
         if response.status_code == 409:
             log.error(

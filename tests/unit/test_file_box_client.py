@@ -17,6 +17,7 @@
 
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
@@ -30,9 +31,13 @@ pytestmark = pytest.mark.asyncio()
 TEST_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 
 
-async def test_create_file_upload_box(config: ConfigFixture, httpx_mock: HTTPXMock):
+async def test_create_file_upload_box(
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
+):
     """Test the create_file_upload_box function"""
-    file_upload_box_client = FileBoxClient(config=config.config)
+    file_upload_box_client = FileBoxClient(
+        config=config.config, httpx_client=httpx_client
+    )
     httpx_mock.add_response(201, json=str(TEST_BOX_ID))
     box_id = await file_upload_box_client.create_file_upload_box(storage_alias="HD01")
     assert box_id == TEST_BOX_ID, "Failed happy path"
@@ -48,9 +53,13 @@ async def test_create_file_upload_box(config: ConfigFixture, httpx_mock: HTTPXMo
         await file_upload_box_client.create_file_upload_box(storage_alias="HD01")
 
 
-async def test_lock_file_upload_box(config: ConfigFixture, httpx_mock: HTTPXMock):
+async def test_lock_file_upload_box(
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
+):
     """Test the lock_file_upload_box function"""
-    file_upload_box_client = FileBoxClient(config=config.config)
+    file_upload_box_client = FileBoxClient(
+        config=config.config, httpx_client=httpx_client
+    )
     httpx_mock.add_response(204)
     await file_upload_box_client.lock_file_upload_box(
         box_id=TEST_BOX_ID
@@ -62,9 +71,13 @@ async def test_lock_file_upload_box(config: ConfigFixture, httpx_mock: HTTPXMock
         await file_upload_box_client.lock_file_upload_box(box_id=TEST_BOX_ID)
 
 
-async def test_unlock_file_upload_box(config: ConfigFixture, httpx_mock: HTTPXMock):
+async def test_unlock_file_upload_box(
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
+):
     """Test the unlock_file_upload_box function"""
-    file_upload_box_client = FileBoxClient(config=config.config)
+    file_upload_box_client = FileBoxClient(
+        config=config.config, httpx_client=httpx_client
+    )
     httpx_mock.add_response(204)
     await file_upload_box_client.unlock_file_upload_box(
         box_id=TEST_BOX_ID
@@ -76,9 +89,13 @@ async def test_unlock_file_upload_box(config: ConfigFixture, httpx_mock: HTTPXMo
         await file_upload_box_client.unlock_file_upload_box(box_id=TEST_BOX_ID)
 
 
-async def test_get_file_upload_list(config: ConfigFixture, httpx_mock: HTTPXMock):
+async def test_get_file_upload_list(
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
+):
     """Test the get_file_upload_list function"""
-    file_upload_box_client = FileBoxClient(config=config.config)
+    file_upload_box_client = FileBoxClient(
+        config=config.config, httpx_client=httpx_client
+    )
     file_list_response = [
         FileUploadWithAccession(
             id=uuid4(),
