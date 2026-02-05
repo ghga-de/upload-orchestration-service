@@ -25,7 +25,7 @@ from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
-from uos.core.models import UpdateUploadBoxRequest
+from uos.core.models import AccessionMap, FileIdToAccession, UpdateUploadBoxRequest
 
 pytestmark = pytest.mark.asyncio()
 
@@ -71,7 +71,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         roles=["data_steward"],
     )
 
-    # 1. Creating a box (requires data steward)
+    # Create a box (requires data steward)
     httpx_mock.add_response(
         method="POST",
         url=f"{file_box_service_url}/boxes",
@@ -100,7 +100,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert len(box_event_recorder.recorded_events) == 1
     assert box_event_recorder.recorded_events[0].payload["id"] == str(box_id)
 
-    # 2. Granting a user access to said box
+    # Grant a user access to said box
     httpx_mock.add_response(
         method="POST",
         url=f"{access_url}/upload-access/users/{regular_user_id}/ivas/{iva_id}/boxes/{box_id}",
@@ -117,7 +117,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         granting_user_id=ds_user_id,
     )
 
-    # 3. Updating the title or description of the box by a DS
+    # Update the title or description of the box by a DS
     update_request = UpdateUploadBoxRequest(
         title="Updated Test Box",
         description="Updated description",
@@ -140,7 +140,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert len(box_event_recorder.recorded_events) == 1
     assert box_event_recorder.recorded_events[0].payload["title"] == "Updated Test Box"
 
-    # 4. Receiving a FileUploadBox update event from kafka (which belongs to the box)
+    # Receive a FileUploadBox update event from kafka (which belongs to the box)
     file_upload_box_event: dict[str, Any] = {
         "id": str(file_upload_box_id),
         "version": 3,
@@ -166,7 +166,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert len(recorder.recorded_events) == 1
     assert recorder.recorded_events[0].payload["file_count"] == 3  # check one property
 
-    # 5. Querying the box (should show updated file count and size)
+    # Query the box (should show updated file count and size)
     httpx_mock.add_response(
         method="GET",
         url=f"{access_url}/upload-access/users/{regular_user_id}/boxes/{box_id}",
@@ -183,7 +183,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert updated_box.file_count == 3
     assert updated_box.size == 1024000
 
-    # 6. Setting the state to LOCKED
+    # Set the state to LOCKED
     lock_request = UpdateUploadBoxRequest(state="locked")
     httpx_mock.add_response(
         method="PATCH",
@@ -202,3 +202,104 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         auth_context=user_auth_context,
     )
     assert final_box.state == "locked"
+
+    # Submit accession map
+    # Create test file IDs for files in the box
+    file_id_1 = uuid4()
+    file_id_2 = uuid4()
+    file_id_3 = uuid4()
+
+    # Mock the file box service to return the list of files
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{file_box_service_url}/boxes/{file_upload_box_id}/uploads",
+        status_code=200,
+        json=[
+            {
+                "id": str(file_id_1),
+                "box_id": str(file_upload_box_id),
+                "storage_alias": "test-storage",
+                "bucket_id": "inbox",
+                "alias": "file1.txt",
+                "decrypted_sha256": "checksum1",
+                "decrypted_size": 1000,
+                "part_size": 100,
+                "state": "awaiting_archival",
+                "state_updated": now_utc_ms_prec().isoformat(),
+            },
+            {
+                "id": str(file_id_2),
+                "box_id": str(file_upload_box_id),
+                "storage_alias": "test-storage",
+                "bucket_id": "inbox",
+                "alias": "file2.txt",
+                "decrypted_sha256": "checksum2",
+                "decrypted_size": 2000,
+                "part_size": 100,
+                "state": "awaiting_archival",
+                "state_updated": now_utc_ms_prec().isoformat(),
+            },
+            {
+                "id": str(file_id_3),
+                "box_id": str(file_upload_box_id),
+                "storage_alias": "test-storage",
+                "bucket_id": "inbox",
+                "alias": "file3.txt",
+                "decrypted_sha256": "checksum3",
+                "decrypted_size": 3000,
+                "part_size": 100,
+                "state": "awaiting_archival",
+                "state_updated": now_utc_ms_prec().isoformat(),
+            },
+        ],
+    )
+
+    # Submit an accession map
+    accession_map = AccessionMap(
+        box_id=box_id,
+        mappings=[
+            FileIdToAccession(file_id=file_id_1, accession="EGAF00000000001"),
+            FileIdToAccession(file_id=file_id_2, accession="EGAF00000000002"),
+            FileIdToAccession(file_id=file_id_3, accession="EGAF00000000003"),
+        ],
+    )
+    await joint_fixture.upload_orchestrator.update_accession_map(
+        accession_map=accession_map
+    )
+
+    # Mock the archive endpoint
+    httpx_mock.add_response(
+        method="PATCH",
+        url=f"{file_box_service_url}/boxes/{file_upload_box_id}",
+        status_code=204,
+    )
+
+    # Archive the box
+    async with (
+        joint_fixture.kafka.record_events(in_topic=audit_topic) as audit_event_recorder,
+        joint_fixture.kafka.record_events(
+            in_topic=research_box_topic
+        ) as box_event_recorder,
+    ):
+        await joint_fixture.upload_orchestrator.archive_research_data_upload_box(
+            box_id=box_id,
+            version=final_box.version,
+            data_steward_id=ds_user_id,
+        )
+
+    # Verify audit and box events were published
+    assert audit_event_recorder.recorded_events
+    audit_event = audit_event_recorder.recorded_events[0]
+    assert audit_event.payload["label"] == "ResearchDataUploadBox updated"
+    assert box_event_recorder.recorded_events
+    assert len(box_event_recorder.recorded_events) == 1
+    assert box_event_recorder.recorded_events[0].payload["state"] == "archived"
+
+    # Verify the box is now archived
+    archived_box = await joint_fixture.upload_orchestrator.get_research_data_upload_box(
+        box_id=box_id,
+        auth_context=ds_auth_context,
+    )
+    assert archived_box.state == "archived"
+    assert archived_box.file_upload_box_state == "archived"
+    assert archived_box.version == final_box.version + 1
