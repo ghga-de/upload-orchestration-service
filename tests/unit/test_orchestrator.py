@@ -937,7 +937,7 @@ async def test_archive_research_data_upload_box_happy(
     assert any("already been archived" in msg for msg in warning_messages)
 
     # Verify file box client was NOT called
-    rig.file_upload_box_client.archive_file_upload_box.assert_not_called()  # type: ignore
+    rig.file_upload_box_client.archive_file_upload_box.assert_not_called()
 
 
 async def test_archive_research_data_upload_box_box_not_found(rig: JointRig):
