@@ -136,7 +136,7 @@ async def prepare_rest_app(
     async with (
         prepare_core_with_override(
             config=config, upload_orchestrator_override=upload_orchestrator_override
-        ) as reverse_transpiler,
+        ) as upload_orchestrator,
         GHGAAuthContextProvider.construct(
             config=config,
             context_class=AuthContext,
@@ -144,7 +144,7 @@ async def prepare_rest_app(
     ):
         app.dependency_overrides[dummies.auth_provider] = lambda: auth_context
         app.dependency_overrides[dummies.upload_orchestrator_port] = lambda: (
-            reverse_transpiler
+            upload_orchestrator
         )
         yield app
 

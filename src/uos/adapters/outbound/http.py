@@ -128,7 +128,7 @@ class AccessClient(AccessClientPort):
 
         if response.status_code == 404:
             raise self.GrantNotFoundError()
-        elif response.status_code != 204:
+        else:
             log.error(
                 "Failed to revoke upload access for grant ID %s.",
                 grant_id,
@@ -373,9 +373,10 @@ class FileBoxClient(FileBoxClientPort):
         )
         if response.status_code != 200:
             log.error(
-                "Error unlocking FileUploadBox ID %s in external service.",
+                "Error getting file list for FileUploadBox %s.",
                 box_id,
                 extra={
+                    "file_upload_box_id": box_id,
                     "status_code": response.status_code,
                     "response_body": response.json(),
                 },

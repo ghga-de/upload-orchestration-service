@@ -242,6 +242,8 @@ class UploadOrchestratorPort(ABC):
         files in that upload box. Then, it verifies that each file ID in the mapping
         exists in the retrieved list of files. Finally, it stores the mapping in the DB.
 
+        **Files with a state of *cancelled* or *failed* are ignored.**
+
         Raises:
             BoxNotFoundError: If the box doesn't exist
             AccessionMapError: If the accession map includes a file ID that doesn't

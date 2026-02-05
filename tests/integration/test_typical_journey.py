@@ -117,7 +117,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         granting_user_id=ds_user_id,
     )
 
-    # Update the title or description of the box by a DS
+    # Update the title or description of the box by a DS (this bumps version to 1)
     update_request = UpdateUploadBoxRequest(
         title="Updated Test Box",
         description="Updated description",
@@ -141,11 +141,12 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert box_event_recorder.recorded_events[0].payload["title"] == "Updated Test Box"
 
     # Receive a FileUploadBox update event from kafka (which belongs to the box)
+    # This bumps version to 2
     file_upload_box_event: dict[str, Any] = {
         "id": str(file_upload_box_id),
-        "version": 3,
+        "version": 1,
         "state": "open",
-        "file_count": 3,
+        "file_count": 1,
         "size": 1024000,
         "storage_alias": "test-storage",
     }
@@ -164,7 +165,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         await joint_fixture.event_subscriber.run(forever=False)
     assert recorder.recorded_events
     assert len(recorder.recorded_events) == 1
-    assert recorder.recorded_events[0].payload["file_count"] == 3  # check one property
+    assert recorder.recorded_events[0].payload["file_count"] == 1  # check one property
 
     # Query the box (should show updated file count and size)
     httpx_mock.add_response(
@@ -178,9 +179,9 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     )
     assert updated_box.title == "Updated Test Box"
     assert updated_box.description == "Updated description"
-    assert updated_box.version == 1
-    assert updated_box.file_upload_box_version == 3
-    assert updated_box.file_count == 3
+    assert updated_box.version == 2
+    assert updated_box.file_upload_box_version == 1
+    assert updated_box.file_count == 1
     assert updated_box.size == 1024000
 
     # Set the state to LOCKED

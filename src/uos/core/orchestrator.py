@@ -137,6 +137,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
         changed_fields = {
             k: v for k, v in request.model_dump().items() if v and getattr(box, k) != v
         }
+        if not changed_fields:
+            log.info(
+                "RDUB update request for box %s did not contain any changes.", box_id
+            )
+            return
+
         updated_box = box.model_copy(update=changed_fields)
 
         # If not a data steward, the only acceptable update is to move from OPEN to LOCKED
@@ -146,26 +152,46 @@ class UploadOrchestrator(UploadOrchestratorPort):
         ):
             raise self.BoxAccessError("Unauthorized")
 
-        # If locking or unlocking, communicate with service that owns file upload boxes
-        #  (errors handled in file_upload_box_client)
-        if updated_box.state and updated_box.state != box.state and box.state == "open":
-            await self._file_upload_box_client.lock_file_upload_box(
-                box_id=box.file_upload_box_id
-            )
-            updated_box.file_upload_box_state = "locked"
-        elif (
-            updated_box.state and updated_box.state == "open" and box.state == "locked"
-        ):
-            await self._file_upload_box_client.unlock_file_upload_box(
-                box_id=box.file_upload_box_id
-            )
-            updated_box.file_upload_box_state = "open"
-
         # Update the research data upload box in the DB
-        updated_box.last_changed = now_utc_ms_prec()
         user_id = UUID(auth_context.id)
         updated_box.changed_by = user_id
-        await self._box_dao.update(updated_box)
+        updated_box.last_changed = now_utc_ms_prec()
+        updated_box.version += 1
+
+        # If locking or unlocking, communicate with service that owns file upload boxes
+        #  (errors handled in file_upload_box_client)
+        if box.state == "open" and updated_box.state == "locked":
+            updated_box.file_upload_box_state = "locked"
+            await self._box_dao.update(updated_box)
+            try:
+                await self._file_upload_box_client.lock_file_upload_box(
+                    box_id=box.file_upload_box_id
+                )
+            except Exception:
+                log.warning(
+                    "Failed to update FUB %s, rolling back changed for RDUB %s",
+                    box.file_upload_box_id,
+                    box_id,
+                )
+                await self._box_dao.update(box)
+                raise
+        elif box.state == "locked" and updated_box.state == "open":
+            updated_box.file_upload_box_state = "open"
+            await self._box_dao.update(updated_box)
+            try:
+                await self._file_upload_box_client.unlock_file_upload_box(
+                    box_id=box.file_upload_box_id
+                )
+            except Exception:
+                log.warning(
+                    "Failed to update FUB %s, rolling back changed for RDUB %s",
+                    box.file_upload_box_id,
+                    box_id,
+                )
+                await self._box_dao.update(box)
+                raise
+        else:
+            await self._box_dao.update(updated_box)
 
         # Create audit record
         await self._audit_repository.log_box_updated(box=updated_box, user_id=user_id)
@@ -307,6 +333,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
             AccessAPIError: if there's a problem communicating with the access API.
             BoxNotFoundError: If the box doesn't exist.
         """
+        # TODO: Should we block access to archived boxes, or let that be handled IRL?
         # Verify the upload box exists
         await self._box_dao.get_by_id(box_id)
 
@@ -528,12 +555,16 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Returns a BoxRetrievalResults instance with the boxes and unpaginated count.
         """
         if skip is not None and skip < 0:
+            log.warning(
+                "Received invalid arg %i for skip parameter, setting to None", skip
+            )
             skip = None
-            log.warning("Received invalid arg %i for skip parameter, setting to 0")
 
         if limit is not None and limit < 0:
+            log.warning(
+                "Received invalid arg %i for limit parameter, setting to None", limit
+            )
             limit = None
-            log.warning("Received invalid arg %i for limit parameter, setting to None")
 
         # Check if user is a data steward
         is_ds = is_data_steward(auth_context)
@@ -582,6 +613,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
         files in that upload box. Then, it verifies that each file ID in the mapping
         exists in the retrieved list of files. Finally, it stores the mapping in the DB.
 
+        **Files with a state of *cancelled* or *failed* are ignored.**
+
         Raises:
             BoxNotFoundError: If the box doesn't exist
             AccessionMapError: If the accession map includes a file ID that doesn't
@@ -593,6 +626,16 @@ class UploadOrchestrator(UploadOrchestratorPort):
             box = await self._box_dao.get_by_id(box_id)
         except ResourceNotFoundError as err:
             raise self.BoxNotFoundError(box_id=box_id) from err
+
+        # Don't allow changes to archived boxes
+        if box.state == "archived":
+            log.error(
+                "Cannot update accessions for RDUB %s because it is already archived",
+                box_id,
+            )
+            raise self.AccessionMapError(
+                "Data already archived - accessions cannot be modified."
+            )
 
         # Check for duplicate accession numbers within this set before storing
         accessions = set(mapping.accession for mapping in accession_map.mappings)
