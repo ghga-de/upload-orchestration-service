@@ -411,6 +411,17 @@ components:
       - type
       title: ValidationError
       type: object
+    VersionModel:
+      description: Model for the HTTP API to include the RDUB version number
+      properties:
+        version:
+          description: A counter indicating resource version
+          title: Version
+          type: integer
+      required:
+      - version
+      title: VersionModel
+      type: object
   securitySchemes:
     HTTPBearer:
       scheme: bearer
@@ -799,7 +810,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AccessionMap'
+              $ref: '#/components/schemas/VersionModel'
         required: true
       responses:
         '204':
@@ -809,7 +820,7 @@ paths:
         '404':
           description: Upload box not found.
         '409':
-          description: Accession map does not match database.
+          description: Request is outdated.
         '422':
           description: Validation error in request body.
       security:

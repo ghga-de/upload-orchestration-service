@@ -42,6 +42,7 @@ from uos.core.models import (
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
     UploadBoxState,
+    VersionModel,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
@@ -212,19 +213,33 @@ async def create_research_data_upload_box(
         204: {"description": "Upload box archival successfully initiated."},
         403: {"description": "Access denied."},
         404: {"description": "Upload box not found."},
-        409: {"description": "Accession map does not match database."},
+        409: {"description": "Request is outdated."},
         422: {"description": "Validation error in request body."},
     },
 )
 @TRACER.start_as_current_span("routes.archive_research_data_upload_box")
 async def archive_research_data_upload_box(
     box_id: UUID4,
-    request: AccessionMap,
+    request: VersionModel,
     upload_service: UploadOrchestratorDummy,
     auth_context: StewardAuthContext,
 ) -> None:
     """Archive a ResearchDataUploadBox"""
-    pass  # TODO: fill out
+    try:
+        await upload_service.archive_research_data_upload_box(
+            box_id=box_id,
+            version=request.version,
+            data_steward_id=UUID(auth_context.id),
+        )
+    except UploadOrchestratorPort.BoxNotFoundError as err:
+        raise HttpBoxNotFoundError(box_id=box_id) from err
+    except UploadOrchestratorPort.OutdatedInfoError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
+    except UploadOrchestratorPort.ArchivalPrereqsError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to archive upload box") from err
 
 
 @router.patch(
@@ -461,3 +476,6 @@ async def submit_accession_map(
         raise HTTPException(status_code=400, detail=str(err)) from err
     except UploadOrchestratorPort.BoxNotFoundError as err:
         raise HttpBoxNotFoundError(box_id=request.box_id) from err
+    except Exception as err:
+        log.error(err, exc_info=True)
+        raise HttpInternalError(message="Failed to update accession map") from err

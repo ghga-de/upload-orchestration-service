@@ -104,7 +104,7 @@ async def test_get_research_data_upload_box(
         # unauthenticated
         url = f"/boxes/{TEST_BOX_ID}"
         response = await rest_client.get(url)
-        assert response.status_code == 403
+        assert response.status_code == 401
 
         # bad credentials
         response = await rest_client.get(url, headers=bad_auth_headers)
@@ -172,7 +172,7 @@ async def test_create_research_data_upload_box(
 
         # unauthenticated
         response = await rest_client.post(url, json=request_data)
-        assert response.status_code == 403
+        assert response.status_code == 401
 
         # bad credentials
         response = await rest_client.post(
@@ -231,7 +231,7 @@ async def test_update_research_data_upload_box(
 
         # unauthenticated
         response = await rest_client.patch(url, json=request_data)
-        assert response.status_code == 403
+        assert response.status_code == 401
 
         # bad credentials
         response = await rest_client.patch(
@@ -315,7 +315,7 @@ async def test_grant_upload_access(
 
         # unauthenticated
         response = await rest_client.post(url, json=request_data)
-        assert response.status_code == 403
+        assert response.status_code == 401
 
         # bad credentials
         response = await rest_client.post(
@@ -361,7 +361,7 @@ async def test_list_upload_box_files(
 
         # unauthenticated
         response = await rest_client.get(url)
-        assert response.status_code == 403
+        assert response.status_code == 401
 
         # bad credentials
         response = await rest_client.get(url, headers=bad_auth_headers)
@@ -435,7 +435,7 @@ async def test_revoke_upload_access_grant(
 
         # unauthenticated
         response = await rest_client.delete(url)
-        assert response.status_code == 403
+        assert response.status_code == 401
 
         # bad credentials
         response = await rest_client.delete(url, headers=bad_auth_headers)
@@ -480,7 +480,7 @@ async def test_get_upload_access_grants(
 
         # unauthenticated
         response = await rest_client.get(url)
-        assert response.status_code == 403
+        assert response.status_code == 401
 
         # bad credentials
         response = await rest_client.get(url, headers=bad_auth_headers)
@@ -658,3 +658,151 @@ async def test_get_boxes_bad_parameters(config: ConfigFixture, ds_auth_headers, 
         url = "/boxes"
         response = await rest_client.get(url, headers=ds_auth_headers, params=params)
         assert response.status_code == 422
+
+
+async def test_archive_research_data_upload_box(
+    config: ConfigFixture, ds_auth_headers, user_auth_headers, bad_auth_headers
+):
+    """Test the POST /rpc/archive/{box_id} endpoint"""
+    orchestrator = AsyncMock()
+    async with (
+        prepare_rest_app(
+            config=config.config, upload_orchestrator_override=orchestrator
+        ) as app,
+        AsyncTestClient(app=app) as rest_client,
+    ):
+        url = f"/rpc/archive/{TEST_BOX_ID}"
+        request_data = {"version": 0}
+
+        # unauthenticated
+        response = await rest_client.post(url, json=request_data)
+        assert response.status_code == 401
+
+        # bad credentials
+        response = await rest_client.post(
+            url, json=request_data, headers=bad_auth_headers
+        )
+        assert response.status_code == 401
+
+        # normal response but user is not a data steward (no data_steward role)
+        response = await rest_client.post(
+            url, json=request_data, headers=user_auth_headers
+        )
+        assert response.status_code == 403
+
+        # normal response with data steward role
+        orchestrator.archive_research_data_upload_box.return_value = None
+        response = await rest_client.post(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 204
+
+        # handle box not found error from core
+        orchestrator.reset_mock()
+        orchestrator.archive_research_data_upload_box.side_effect = (
+            UploadOrchestratorPort.BoxNotFoundError(box_id=TEST_BOX_ID)
+        )
+        response = await rest_client.post(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 404
+
+        # handle outdated info error from core
+        orchestrator.reset_mock()
+        orchestrator.archive_research_data_upload_box.side_effect = (
+            UploadOrchestratorPort.OutdatedInfoError()
+        )
+        response = await rest_client.post(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 409
+
+        # handle archival prerequisites error from core
+        orchestrator.reset_mock()
+        orchestrator.archive_research_data_upload_box.side_effect = (
+            UploadOrchestratorPort.ArchivalPrereqsError()
+        )
+        response = await rest_client.post(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 409
+
+        # handle other exception
+        orchestrator.reset_mock()
+        orchestrator.archive_research_data_upload_box.side_effect = TypeError()
+        response = await rest_client.post(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 500
+
+
+async def test_submit_accession_map(
+    config: ConfigFixture, ds_auth_headers, user_auth_headers, bad_auth_headers
+):
+    """Test the PATCH /boxes/{box_id}/accessions endpoint"""
+    orchestrator = AsyncMock()
+    async with (
+        prepare_rest_app(
+            config=config.config, upload_orchestrator_override=orchestrator
+        ) as app,
+        AsyncTestClient(app=app) as rest_client,
+    ):
+        url = f"/boxes/{TEST_BOX_ID}/accessions"
+        request_data = {
+            "box_id": str(TEST_BOX_ID),
+            "mappings": [
+                {"file_id": str(uuid4()), "accession": "ACC001"},
+                {"file_id": str(uuid4()), "accession": "ACC002"},
+            ],
+        }
+
+        # unauthenticated
+        response = await rest_client.patch(url, json=request_data)
+        assert response.status_code == 401
+
+        # bad credentials
+        response = await rest_client.patch(
+            url, json=request_data, headers=bad_auth_headers
+        )
+        assert response.status_code == 401
+
+        # normal response but user is not a data steward (no data_steward role)
+        response = await rest_client.patch(
+            url, json=request_data, headers=user_auth_headers
+        )
+        assert response.status_code == 403
+
+        # normal response with data steward role
+        orchestrator.update_accession_map.return_value = None
+        response = await rest_client.patch(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 204
+
+        # handle accession map error from core
+        orchestrator.reset_mock()
+        orchestrator.update_accession_map.side_effect = (
+            UploadOrchestratorPort.AccessionMapError()
+        )
+        response = await rest_client.patch(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 400
+
+        # handle box not found error from core
+        orchestrator.reset_mock()
+        orchestrator.update_accession_map.side_effect = (
+            UploadOrchestratorPort.BoxNotFoundError(box_id=TEST_BOX_ID)
+        )
+        response = await rest_client.patch(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 404
+
+        # handle other exception
+        orchestrator.reset_mock()
+        orchestrator.update_accession_map.side_effect = TypeError()
+        response = await rest_client.patch(
+            url, json=request_data, headers=ds_auth_headers
+        )
+        assert response.status_code == 500
