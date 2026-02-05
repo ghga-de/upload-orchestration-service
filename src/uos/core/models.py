@@ -59,7 +59,6 @@ class ResearchDataUploadBox(BaseModel):
     file_upload_box_version: int = Field(
         ..., description="A counter indicating resource version"
     )
-    # TODO: shorten id field name to fub_id
     file_upload_box_state: UploadBoxState = Field(
         ..., description="Current state of the file upload box"
     )

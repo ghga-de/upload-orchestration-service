@@ -49,7 +49,9 @@ USER1_AUTH_CONTEXT.id = str(TEST_USER_ID1)
 USER1_AUTH_CONTEXT.roles = []
 
 InMemBoxDao = new_mock_dao_class(dto_model=models.ResearchDataUploadBox, id_field="id")
-InMemAccessionMapDao = new_mock_dao_class(dto_model=models.AccessionMap, id_field="id")
+InMemAccessionMapDao = new_mock_dao_class(
+    dto_model=models.AccessionMap, id_field="box_id"
+)
 
 
 @dataclass
@@ -107,7 +109,7 @@ async def populate_boxes(rig: JointRig):
             storage_alias="HD01",
             data_steward_id=TEST_DS_ID,
         )
-        await sleep(0.001)  # insert pause to ensure different timestamps for sortings
+        await sleep(0.001)  # insert pause to ensure different timestamps for sorting
         box_ids.append(box_id)
     return box_ids
 
@@ -643,3 +645,488 @@ async def test_get_boxes_pagination(rig: JointRig, populated_boxes: list[UUID]):
     )
     assert results.count == 5
     assert len(results.boxes) == 5
+
+
+async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[UUID]):
+    """Test the normal path of updating an accession map.
+
+    This test also checks for the BoxNotFoundError case, since that is small enough
+    to include here.
+    """
+    box_id = populated_boxes[0]
+
+    # Create test file uploads
+    test_file_ids = [uuid4() for _ in range(3)]
+    test_file_uploads = [
+        models.FileUploadWithAccession(
+            id=file_id,
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias=f"test{i}",
+            decrypted_sha256=f"checksum{i}",
+            decrypted_size=1000 + i * 100,
+            part_size=100,
+            state="awaiting_archival",
+            state_updated=now_utc_ms_prec(),
+        )
+        for i, file_id in enumerate(test_file_ids)
+    ]
+
+    # Mock the file box client
+    rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
+
+    # Create an accession map
+    accession_map = models.AccessionMap(
+        box_id=box_id,
+        mappings=[
+            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
+            models.FileIdToAccession(file_id=test_file_ids[1], accession="TEST2"),
+            models.FileIdToAccession(file_id=test_file_ids[2], accession="TEST3"),
+        ],
+    )
+
+    # Verify that a BoxNotFoundError is raised if the map points to a non-existent box
+    bad_map = accession_map.model_copy(update={"box_id": uuid4()})
+    with pytest.raises(rig.controller.BoxNotFoundError):
+        await rig.controller.update_accession_map(accession_map=bad_map)
+
+    # Verify file box client was not called
+    rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
+
+    # Call the method with the valid map now
+    await rig.controller.update_accession_map(accession_map=accession_map)
+
+    # Verify the accession map was stored
+    stored_map = await rig.accession_map_dao.get_by_id(box_id)
+    assert stored_map.box_id == box_id
+    assert len(stored_map.mappings) == 3
+
+    # Verify file box client was called
+    rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
+
+
+async def test_update_accession_map_duplicate_accessions(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that duplicate accessions in a map raise AccessionMapError."""
+    box_id = populated_boxes[0]
+
+    # Create an accession map with duplicate accessions
+    accession_map = models.AccessionMap(
+        box_id=box_id,
+        mappings=[
+            models.FileIdToAccession(file_id=uuid4(), accession="TEST1"),
+            models.FileIdToAccession(file_id=uuid4(), accession="TEST1"),  # Duplicate!
+        ],
+    )
+
+    # This should raise AccessionMapError due to duplicate accessions
+    with pytest.raises(rig.controller.AccessionMapError) as exc_info:
+        await rig.controller.update_accession_map(accession_map=accession_map)
+
+    assert "Duplicate accessions" in str(exc_info.value)
+
+    # Verify file box client was NOT called
+    rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
+
+
+async def test_update_accession_map_invalid_file_ids(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that invalid file IDs in a map raise AccessionMapError."""
+    box_id = populated_boxes[0]
+
+    # Create test file uploads
+    test_file_ids = [uuid4() for _ in range(2)]
+    test_file_uploads = [
+        models.FileUploadWithAccession(
+            id=file_id,
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias=f"test{i}",
+            decrypted_sha256=f"checksum{i}",
+            decrypted_size=1000,
+            part_size=100,
+            state="awaiting_archival",
+            state_updated=now_utc_ms_prec(),
+        )
+        for i, file_id in enumerate(test_file_ids)
+    ]
+
+    # Mock the file box client
+    rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
+
+    # Create an accession map with a file ID that doesn't exist in the box
+    invalid_file_id = uuid4()
+    accession_map = models.AccessionMap(
+        box_id=box_id,
+        mappings=[
+            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
+            models.FileIdToAccession(file_id=invalid_file_id, accession="TEST2"),
+        ],
+    )
+
+    # Should raise AccessionMapError
+    with pytest.raises(rig.controller.AccessionMapError) as exc_info:
+        await rig.controller.update_accession_map(accession_map=accession_map)
+
+    assert "not in the box" in str(exc_info.value)
+
+    # Verify file box client was called
+    rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
+
+
+async def test_update_accession_map_filters_cancelled_and_failed(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that cancelled and failed files are filtered out when validating accession map."""
+    box_id = populated_boxes[0]
+
+    # Create test file uploads including cancelled and failed ones
+    test_file_ids = [uuid4() for _ in range(4)]
+    test_file_uploads = [
+        models.FileUploadWithAccession(
+            id=test_file_ids[0],
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias="test0",
+            decrypted_sha256="checksum0",
+            decrypted_size=1000,
+            part_size=100,
+            state="awaiting_archival",
+            state_updated=now_utc_ms_prec(),
+        ),
+        models.FileUploadWithAccession(
+            id=test_file_ids[1],
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias="test1",
+            decrypted_sha256="checksum1",
+            decrypted_size=1000,
+            part_size=100,
+            state="cancelled",  # This should be filtered out
+            state_updated=now_utc_ms_prec(),
+        ),
+        models.FileUploadWithAccession(
+            id=test_file_ids[2],
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias="test2",
+            decrypted_sha256="checksum2",
+            decrypted_size=1000,
+            part_size=100,
+            state="failed",  # This should be filtered out
+            state_updated=now_utc_ms_prec(),
+        ),
+        models.FileUploadWithAccession(
+            id=test_file_ids[3],
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias="test3",
+            decrypted_sha256="checksum3",
+            decrypted_size=1000,
+            part_size=100,
+            state="awaiting_archival",
+            state_updated=now_utc_ms_prec(),
+        ),
+    ]
+
+    # Mock the file box client
+    rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
+
+    # Create an accession map for only the valid files
+    accession_map = models.AccessionMap(
+        box_id=box_id,
+        mappings=[
+            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
+            models.FileIdToAccession(file_id=test_file_ids[3], accession="TEST2"),
+        ],
+    )
+
+    # This should succeed because cancelled and failed files are ignored
+    await rig.controller.update_accession_map(accession_map=accession_map)
+
+    # Verify the accession map was stored
+    stored_map = await rig.accession_map_dao.get_by_id(box_id)
+    assert len(stored_map.mappings) == 2
+
+
+async def test_archive_research_data_upload_box_happy(
+    rig: JointRig, populated_boxes: list[UUID], caplog
+):
+    """Test the normal path of archiving a research data upload box.
+
+    This test also checks for a repeat call for archival.
+    """
+    box_id = populated_boxes[0]
+
+    # Lock the box first
+    box = await rig.box_dao.get_by_id(box_id)
+    box.state = "locked"
+    box.version = 1
+    await rig.box_dao.update(box)
+
+    # Create test file uploads
+    test_file_ids = [uuid4() for _ in range(2)]
+    test_file_uploads = [
+        models.FileUploadWithAccession(
+            id=file_id,
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias=f"test{i}",
+            decrypted_sha256=f"checksum{i}",
+            decrypted_size=1000,
+            part_size=100,
+            state="awaiting_archival",
+            state_updated=now_utc_ms_prec(),
+        )
+        for i, file_id in enumerate(test_file_ids)
+    ]
+
+    # Mock the file box client
+    rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
+    rig.file_upload_box_client.archive_file_upload_box = AsyncMock()  # type: ignore
+
+    # Create an accession map
+    accession_map = models.AccessionMap(
+        box_id=box_id,
+        mappings=[
+            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
+            models.FileIdToAccession(file_id=test_file_ids[1], accession="TEST2"),
+        ],
+    )
+    await rig.accession_map_dao.insert(accession_map)
+
+    # Call the method
+    await rig.controller.archive_research_data_upload_box(
+        box_id=box_id,
+        version=1,
+        data_steward_id=TEST_DS_ID,
+    )
+
+    # Verify the box was updated
+    updated_box = await rig.box_dao.get_by_id(box_id)
+    assert updated_box.state == "archived"
+    assert updated_box.version == 2
+    assert updated_box.file_upload_box_state == "archived"
+    assert updated_box.file_upload_box_version == 1
+    assert updated_box.changed_by == TEST_DS_ID
+
+    # Verify file box client was called to archive
+    rig.file_upload_box_client.archive_file_upload_box.assert_called_once()
+
+    # Now try again and make sure the process exits early
+    rig.file_upload_box_client.archive_file_upload_box.reset_mock()
+    await rig.controller.archive_research_data_upload_box(
+        box_id=box_id,
+        version=2,
+        data_steward_id=TEST_DS_ID,
+    )
+
+    # Verify a warning was logged
+    warning_messages = [
+        record.message for record in caplog.records if record.levelname == "WARNING"
+    ]
+    assert any("already been archived" in msg for msg in warning_messages)
+
+    # Verify file box client was NOT called
+    rig.file_upload_box_client.archive_file_upload_box.assert_not_called()  # type: ignore
+
+
+async def test_archive_research_data_upload_box_box_not_found(rig: JointRig):
+    """Test that archiving a non-existent box raises BoxNotFoundError."""
+    non_existent_box_id = uuid4()
+
+    # This should raise BoxNotFoundError
+    with pytest.raises(rig.controller.BoxNotFoundError):
+        await rig.controller.archive_research_data_upload_box(
+            box_id=non_existent_box_id,
+            version=0,
+            data_steward_id=TEST_DS_ID,
+        )
+
+
+async def test_archive_research_data_upload_box_outdated_version(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that archiving with outdated version info raises OutdatedInfoError."""
+    box_id = populated_boxes[0]
+
+    # Lock the box and update version
+    box = await rig.box_dao.get_by_id(box_id)
+    box.state = "locked"
+    box.version = 5
+    await rig.box_dao.update(box)
+
+    # Try to archive with outdated version
+    with pytest.raises(rig.controller.OutdatedInfoError) as exc_info:
+        await rig.controller.archive_research_data_upload_box(
+            box_id=box_id,
+            version=3,  # Outdated!
+            data_steward_id=TEST_DS_ID,
+        )
+
+    assert "has changed" in str(exc_info.value)
+
+
+async def test_archive_research_data_upload_box_not_locked(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that archiving an unlocked box raises ArchivalPrereqsError."""
+    box_id = populated_boxes[0]
+
+    # Get the box (should be in 'open' state)
+    box = await rig.box_dao.get_by_id(box_id)
+    assert box.state == "open"
+
+    # Try to archive without locking first
+    with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
+        await rig.controller.archive_research_data_upload_box(
+            box_id=box_id,
+            version=box.version,
+            data_steward_id=TEST_DS_ID,
+        )
+
+    assert "must be locked" in str(exc_info.value)
+
+
+async def test_archive_research_data_upload_box_no_accession_map(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that archiving without an accession map raises ArchivalPrereqsError."""
+    box_id = populated_boxes[0]
+
+    # Lock the box
+    box = await rig.box_dao.get_by_id(box_id)
+    box.state = "locked"
+    await rig.box_dao.update(box)
+
+    # Try to archive without creating an accession map
+    with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
+        await rig.controller.archive_research_data_upload_box(
+            box_id=box_id,
+            version=box.version,
+            data_steward_id=TEST_DS_ID,
+        )
+
+    assert "not been assigned" in str(exc_info.value)
+
+
+async def test_archive_research_data_upload_box_missing_accessions(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that archiving with missing accessions raises ArchivalPrereqsError."""
+    box_id = populated_boxes[0]
+
+    # Lock the box
+    box = await rig.box_dao.get_by_id(box_id)
+    box.state = "locked"
+    await rig.box_dao.update(box)
+
+    # Create 3 test file uploads
+    test_file_ids = [uuid4() for _ in range(3)]
+    test_file_uploads = [
+        models.FileUploadWithAccession(
+            id=file_id,
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias=f"test{i}",
+            decrypted_sha256=f"checksum{i}",
+            decrypted_size=1000,
+            part_size=100,
+            state="awaiting_archival",
+            state_updated=now_utc_ms_prec(),
+        )
+        for i, file_id in enumerate(test_file_ids)
+    ]
+
+    # Mock the file box client to return the file uploads
+    rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
+
+    # Create an incomplete accession map (missing the third file)
+    accession_map = models.AccessionMap(
+        box_id=box_id,
+        mappings=[
+            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
+            models.FileIdToAccession(file_id=test_file_ids[1], accession="TEST2"),
+        ],
+    )
+    await rig.accession_map_dao.insert(accession_map)
+
+    # Try to archive with missing accessions
+    with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
+        await rig.controller.archive_research_data_upload_box(
+            box_id=box_id,
+            version=box.version,
+            data_steward_id=TEST_DS_ID,
+        )
+
+    # Check the message in the error
+    assert "missing an accession" in str(exc_info.value)
+    assert str(test_file_ids[2]) in str(exc_info.value)
+
+
+async def test_archive_research_data_upload_box_file_upload_box_version_error(
+    rig: JointRig, populated_boxes: list[UUID]
+):
+    """Test that a FileUploadBox version error during archival raises OutdatedInfoError."""
+    box_id = populated_boxes[0]
+
+    # Lock the box
+    box = await rig.box_dao.get_by_id(box_id)
+    box.state = "locked"
+    await rig.box_dao.update(box)
+
+    # Create test file uploads
+    test_file_ids = [uuid4()]
+    test_file_uploads = [
+        models.FileUploadWithAccession(
+            id=test_file_ids[0],
+            box_id=TEST_FILE_UPLOAD_BOX_ID,
+            storage_alias="HD01",
+            bucket_id="inbox",
+            alias="test0",
+            decrypted_sha256="checksum0",
+            decrypted_size=1000,
+            part_size=100,
+            state="awaiting_archival",
+            state_updated=now_utc_ms_prec(),
+        )
+    ]
+
+    # Mock the file box client
+    rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
+    rig.file_upload_box_client.archive_file_upload_box = AsyncMock(  # type: ignore
+        side_effect=FileBoxClientPort.VersionError("Version mismatch")
+    )
+
+    # Create an accession map
+    accession_map = models.AccessionMap(
+        box_id=box_id,
+        mappings=[
+            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
+        ],
+    )
+    await rig.accession_map_dao.insert(accession_map)
+
+    # Try to archive - should raise OutdatedInfoError due to version mismatch
+    with pytest.raises(rig.controller.OutdatedInfoError) as exc_info:
+        await rig.controller.archive_research_data_upload_box(
+            box_id=box_id,
+            version=box.version,
+            data_steward_id=TEST_DS_ID,
+        )
+
+    assert "has changed" in str(exc_info.value)
+
+    # Verify the box state wasn't updated
+    unchanged_box = await rig.box_dao.get_by_id(box_id)
+    assert unchanged_box.state == "locked"  # Still locked, not archived

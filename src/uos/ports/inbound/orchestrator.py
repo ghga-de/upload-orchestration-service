@@ -179,7 +179,7 @@ class UploadOrchestratorPort(ABC):
     ) -> list[FileUploadWithAccession]:
         """Get list of file uploads for a research data upload box.
 
-        Returns a list of file uploads in the upload box
+        Returns a list of file uploads in the upload box.
 
         Raises:
             BoxNotFoundError: If the box doesn't exist.

@@ -395,7 +395,6 @@ class UploadOrchestrator(UploadOrchestratorPort):
             ),
         )
 
-    # TODO: Add flag for retrieving files minus cancelled and failed files
     async def get_upload_box_files(
         self,
         *,
@@ -404,7 +403,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
     ) -> list[FileUploadWithAccession]:
         """Get list of file uploads for a research data upload box.
 
-        Returns a list of file uploads in the upload box
+        Returns a list of file uploads in the upload box.
 
         Raises:
             BoxNotFoundError: If the box doesn't exist.
@@ -588,7 +587,6 @@ class UploadOrchestrator(UploadOrchestratorPort):
             AccessionMapError: If the accession map includes a file ID that doesn't
                 exist or if there are duplicate accessions.
         """
-        # TODO: Decide if this should require version number or not
         # Make sure the box exists
         box_id = accession_map.box_id
         try:
