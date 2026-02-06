@@ -294,7 +294,13 @@ class FileBoxClient(FileBoxClientPort):
                     "response_text": response.text,
                 },
             )
+            if response.status_code == 400:
+                # Make error text more specific if it's a storage alias problem
+                raise self.OperationError(
+                    f"{storage_alias} is not a valid storage alias."
+                )
             raise self.OperationError("Failed to create new FileUploadBox.")
+
         try:
             box_id = response.json()
             return UUID(box_id)
