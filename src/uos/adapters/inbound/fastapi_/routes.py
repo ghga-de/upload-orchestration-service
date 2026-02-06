@@ -79,6 +79,8 @@ async def health():
             "model": BoxRetrievalResults,
             "description": "Research data upload boxes successfully retrieved.",
         },
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         422: {"description": "Validation error in query parameters."},
     },
 )
@@ -134,6 +136,8 @@ async def get_research_data_upload_boxes(
             "model": ResearchDataUploadBox,
             "description": "Upload box details successfully retrieved.",
         },
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         404: {"description": "Upload box not found or access denied."},
     },
 )
@@ -171,6 +175,8 @@ async def get_research_data_upload_box(
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {"model": UUID4, "description": "Upload box created successfully."},
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         422: {"description": "Validation error in request body."},
     },
 )
@@ -209,9 +215,12 @@ async def create_research_data_upload_box(
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
         204: {"description": "Upload box updated successfully."},
-        403: {"description": "Access denied."},
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         404: {"description": "Upload box not found."},
-        409: {"description": "Request is outdated."},
+        409: {
+            "description": "Update failed due to an outdated request or unmet prerequisites."
+        },
         422: {"description": "Validation error in request body."},
     },
 )
@@ -251,6 +260,8 @@ async def update_research_data_upload_box(
     status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "Upload access granted successfully."},
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         422: {"description": "Validation error in request body."},
     },
 )
@@ -285,6 +296,8 @@ async def grant_upload_access(
         204: {
             "description": "Upload access grant has been revoked.",
         },
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         404: {"description": "The upload access grant was not found."},
     },
     status_code=204,
@@ -319,6 +332,8 @@ async def revoke_upload_access_grant(
             "model": list[GrantWithBoxInfo],
             "description": "Upload access grants have been fetched.",
         },
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
     },
     status_code=200,
 )
@@ -385,7 +400,8 @@ async def get_upload_access_grants(  # noqa: PLR0913
             "model": list[FileUploadWithAccession],
             "description": "File upload information successfully retrieved.",
         },
-        401: {"description": "Access denied."},
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         404: {"description": "Upload box not found."},
     },
 )
@@ -419,7 +435,8 @@ async def list_upload_box_files(
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
         204: {"description": "Accession map successfully submitted."},
-        403: {"description": "Access denied."},
+        401: {"description": "Not authenticated."},
+        403: {"description": "Not authorized."},
         404: {"description": "Upload box not found."},
         422: {"description": "Validation error in request body."},
     },

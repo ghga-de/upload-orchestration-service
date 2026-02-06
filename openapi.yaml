@@ -488,6 +488,10 @@ paths:
                 title: Response 200 Get Upload Access Grants Access Grants Get
                 type: array
           description: Upload access grants have been fetched.
+        '401':
+          description: Not authenticated.
+        '403':
+          description: Not authorized.
         '422':
           content:
             application/json:
@@ -516,6 +520,10 @@ paths:
             application/json:
               schema: {}
           description: Upload access granted successfully.
+        '401':
+          description: Not authenticated.
+        '403':
+          description: Not authorized.
         '422':
           description: Validation error in request body.
       security:
@@ -538,6 +546,10 @@ paths:
       responses:
         '204':
           description: Upload access grant has been revoked.
+        '401':
+          description: Not authenticated.
+        '403':
+          description: Not authorized.
         '404':
           description: The upload access grant was not found.
         '422':
@@ -602,6 +614,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/BoxRetrievalResults'
           description: Research data upload boxes successfully retrieved.
+        '401':
+          description: Not authenticated.
+        '403':
+          description: Not authorized.
         '422':
           description: Validation error in query parameters.
       security:
@@ -628,6 +644,10 @@ paths:
                 title: Response 201 Create Research Data Upload Box Boxes Post
                 type: string
           description: Upload box created successfully.
+        '401':
+          description: Not authenticated.
+        '403':
+          description: Not authorized.
         '422':
           description: Validation error in request body.
       security:
@@ -654,6 +674,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ResearchDataUploadBox'
           description: Upload box details successfully retrieved.
+        '401':
+          description: Not authenticated.
+        '403':
+          description: Not authorized.
         '404':
           description: Upload box not found or access denied.
         '422':
@@ -693,12 +717,14 @@ paths:
       responses:
         '204':
           description: Upload box updated successfully.
+        '401':
+          description: Not authenticated.
         '403':
-          description: Access denied.
+          description: Not authorized.
         '404':
           description: Upload box not found.
         '409':
-          description: Request is outdated.
+          description: Update failed due to an outdated request or unmet prerequisites.
         '422':
           description: Validation error in request body.
       security:
@@ -727,8 +753,10 @@ paths:
       responses:
         '204':
           description: Accession map successfully submitted.
+        '401':
+          description: Not authenticated.
         '403':
-          description: Access denied.
+          description: Not authorized.
         '404':
           description: Upload box not found.
         '422':
@@ -762,7 +790,9 @@ paths:
                 type: array
           description: File upload information successfully retrieved.
         '401':
-          description: Access denied.
+          description: Not authenticated.
+        '403':
+          description: Not authorized.
         '404':
           description: Upload box not found.
         '422':
