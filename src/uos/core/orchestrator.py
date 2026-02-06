@@ -28,6 +28,7 @@ from hexkit.protocols.dao import (
 from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
+from uos.constants import VALID_STATE_TRANSITIONS
 from uos.core.models import (
     AccessionMap,
     BoxRetrievalResults,
@@ -215,8 +216,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Raises:
             StateChangeError: If the state transition is invalid.
         """
-        valid = [("open", "locked"), ("locked", "open"), ("locked", "archived")]
-        if (old_state, new_state) not in valid:
+        if (old_state, new_state) not in VALID_STATE_TRANSITIONS:
             raise self.StateChangeError(old_state=old_state, new_state=new_state)
 
     async def _handle_state_change(

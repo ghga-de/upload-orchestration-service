@@ -24,3 +24,8 @@ AUDIT_COLLECTION = "auditLogs"
 WORK_ORDER_TOKEN_VALID_SECONDS = 30
 ACCESSION_MAPS_COLLECTION = "accessionMaps"
 HTTPX_TIMEOUT = 60
+VALID_STATE_TRANSITIONS = [
+    ("open", "locked"),
+    ("locked", "open"),
+    ("locked", "archived"),
+]
