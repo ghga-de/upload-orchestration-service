@@ -119,6 +119,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
 
     # Update the title or description of the box by a DS (this bumps version to 1)
     update_request = UpdateUploadBoxRequest(
+        version=0,  # Initial version
         title="Updated Test Box",
         description="Updated description",
     )
@@ -185,7 +186,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert updated_box.size == 1024000
 
     # Set the state to LOCKED
-    lock_request = UpdateUploadBoxRequest(state="locked")
+    lock_request = UpdateUploadBoxRequest(version=updated_box.version, state="locked")
     httpx_mock.add_response(
         method="PATCH",
         url=f"{file_box_service_url}/boxes/{file_upload_box_id}",
@@ -275,17 +276,21 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         status_code=204,
     )
 
-    # Archive the box
+    # Archive the box via update
+    archive_request = UpdateUploadBoxRequest(
+        version=final_box.version, state="archived"
+    )
+
     async with (
         joint_fixture.kafka.record_events(in_topic=audit_topic) as audit_event_recorder,
         joint_fixture.kafka.record_events(
             in_topic=research_box_topic
         ) as box_event_recorder,
     ):
-        await joint_fixture.upload_orchestrator.archive_research_data_upload_box(
+        await joint_fixture.upload_orchestrator.update_research_data_upload_box(
             box_id=box_id,
-            version=final_box.version,
-            data_steward_id=ds_user_id,
+            request=archive_request,
+            auth_context=ds_auth_context,
         )
 
     # Verify audit and box events were published

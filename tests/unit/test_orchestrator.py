@@ -144,13 +144,16 @@ async def test_update_research_data_upload_box_happy(
     # Mock the access client to return that the user has access
     rig.access_client.check_box_access.return_value = True  # type: ignore
 
+    # Get the box to get its current version
+    box_id = populated_boxes[0]
+    box = await rig.box_dao.get_by_id(box_id)
+
     # Create an update request
     update_request = models.UpdateUploadBoxRequest(
-        title="Updated Title", description="Updated Description"
+        version=box.version, title="Updated Title", description="Updated Description"
     )
 
     # Call the update method
-    box_id = populated_boxes[0]
     await rig.controller.update_research_data_upload_box(
         box_id=box_id, request=update_request, auth_context=DATA_STEWARD_AUTH_CONTEXT
     )
@@ -177,12 +180,14 @@ async def test_update_research_data_upload_box_unauthorized(
     rig.access_client.check_box_access.return_value = True  # type: ignore
 
     # Create an update request
+    box_id = populated_boxes[0]
+    box = await rig.box_dao.get_by_id(box_id)
+
     update_request = models.UpdateUploadBoxRequest(
-        title="Updated Title", description="Updated Description"
+        version=box.version, title="Updated Title", description="Updated Description"
     )
 
     # Call the update method
-    box_id = populated_boxes[0]
     with pytest.raises(rig.controller.BoxAccessError):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
@@ -198,7 +203,7 @@ async def test_update_research_data_upload_box_not_found(rig: JointRig):
 
     # Create an update request
     update_request = models.UpdateUploadBoxRequest(
-        title="Updated Title", description="Updated Description"
+        version=0, title="Updated Title", description="Updated Description"
     )
 
     # Try to update a non-existent box ID
@@ -576,9 +581,10 @@ async def test_get_boxes_sorting(rig: JointRig, populated_boxes: list[UUID]):
     locked_box_ids = [populated_boxes[1], populated_boxes[3]]
     for box_id in locked_box_ids:
         await sleep(0.001)
+        box = await rig.box_dao.get_by_id(box_id)
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
-            request=models.UpdateUploadBoxRequest(state="locked"),
+            request=models.UpdateUploadBoxRequest(version=box.version, state="locked"),
             auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
@@ -858,12 +864,9 @@ async def test_update_accession_map_filters_cancelled_and_failed(
 
 
 async def test_archive_research_data_upload_box_happy(
-    rig: JointRig, populated_boxes: list[UUID], caplog
+    rig: JointRig, populated_boxes: list[UUID]
 ):
-    """Test the normal path of archiving a research data upload box.
-
-    This test also checks for a repeat call for archival.
-    """
+    """Test the normal path of archiving a research data upload box."""
     box_id = populated_boxes[0]
 
     # Lock the box first
@@ -904,11 +907,13 @@ async def test_archive_research_data_upload_box_happy(
     )
     await rig.accession_map_dao.insert(accession_map)
 
-    # Call the method
-    await rig.controller.archive_research_data_upload_box(
+    # Archive the box via update
+    update_request = models.UpdateUploadBoxRequest(version=1, state="archived")
+
+    await rig.controller.update_research_data_upload_box(
         box_id=box_id,
-        version=1,
-        data_steward_id=TEST_DS_ID,
+        request=update_request,
+        auth_context=DATA_STEWARD_AUTH_CONTEXT,
     )
 
     # Verify the box was updated
@@ -922,84 +927,71 @@ async def test_archive_research_data_upload_box_happy(
     # Verify file box client was called to archive
     rig.file_upload_box_client.archive_file_upload_box.assert_called_once()
 
-    # Now try again and make sure the process exits early
-    rig.file_upload_box_client.archive_file_upload_box.reset_mock()
-    await rig.controller.archive_research_data_upload_box(
-        box_id=box_id,
-        version=2,
-        data_steward_id=TEST_DS_ID,
-    )
 
-    # Verify a warning was logged
-    warning_messages = [
-        record.message for record in caplog.records if record.levelname == "WARNING"
-    ]
-    assert any("already been archived" in msg for msg in warning_messages)
-
-    # Verify file box client was NOT called
-    rig.file_upload_box_client.archive_file_upload_box.assert_not_called()
-
-
-async def test_archive_research_data_upload_box_box_not_found(rig: JointRig):
+async def test_archive_via_update_box_not_found(rig: JointRig):
     """Test that archiving a non-existent box raises BoxNotFoundError."""
     non_existent_box_id = uuid4()
 
+    update_request = models.UpdateUploadBoxRequest(version=0, state="archived")
+
     # This should raise BoxNotFoundError
     with pytest.raises(rig.controller.BoxNotFoundError):
-        await rig.controller.archive_research_data_upload_box(
+        await rig.controller.update_research_data_upload_box(
             box_id=non_existent_box_id,
-            version=0,
-            data_steward_id=TEST_DS_ID,
+            request=update_request,
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
 
-async def test_archive_research_data_upload_box_outdated_version(
-    rig: JointRig, populated_boxes: list[UUID]
-):
-    """Test that archiving with outdated version info raises OutdatedInfoError."""
+async def test_update_box_outdated_version(rig: JointRig, populated_boxes: list[UUID]):
+    """Test that updating with outdated version info raises VersionError."""
     box_id = populated_boxes[0]
 
-    # Lock the box and update version
+    # Update the box version in the database
     box = await rig.box_dao.get_by_id(box_id)
-    box.state = "locked"
     box.version = 5
     await rig.box_dao.update(box)
 
-    # Try to archive with outdated version
-    with pytest.raises(rig.controller.OutdatedInfoError) as exc_info:
-        await rig.controller.archive_research_data_upload_box(
+    # Try to update with outdated version
+    update_request = models.UpdateUploadBoxRequest(
+        version=3,  # Outdated!
+        title="New Title",
+    )
+
+    with pytest.raises(rig.controller.VersionError) as exc_info:
+        await rig.controller.update_research_data_upload_box(
             box_id=box_id,
-            version=3,  # Outdated!
-            data_steward_id=TEST_DS_ID,
+            request=update_request,
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
     assert "has changed" in str(exc_info.value)
 
 
-async def test_archive_research_data_upload_box_not_locked(
-    rig: JointRig, populated_boxes: list[UUID]
-):
-    """Test that archiving an unlocked box raises ArchivalPrereqsError."""
+async def test_archive_box_not_locked(rig: JointRig, populated_boxes: list[UUID]):
+    """Test that archiving an unlocked box raises StateChangeError."""
     box_id = populated_boxes[0]
 
     # Get the box (should be in 'open' state)
     box = await rig.box_dao.get_by_id(box_id)
     assert box.state == "open"
 
-    # Try to archive without locking first
-    with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
-        await rig.controller.archive_research_data_upload_box(
+    # Try to archive without locking first (invalid state transition)
+    update_request = models.UpdateUploadBoxRequest(
+        version=box.version, state="archived"
+    )
+
+    with pytest.raises(rig.controller.StateChangeError) as exc_info:
+        await rig.controller.update_research_data_upload_box(
             box_id=box_id,
-            version=box.version,
-            data_steward_id=TEST_DS_ID,
+            request=update_request,
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
-    assert "must be locked" in str(exc_info.value)
+    assert "cannot be changed from 'open' to 'archived'" in str(exc_info.value).lower()
 
 
-async def test_archive_research_data_upload_box_no_accession_map(
-    rig: JointRig, populated_boxes: list[UUID]
-):
+async def test_archive_box_no_accession_map(rig: JointRig, populated_boxes: list[UUID]):
     """Test that archiving without an accession map raises ArchivalPrereqsError."""
     box_id = populated_boxes[0]
 
@@ -1009,17 +1001,21 @@ async def test_archive_research_data_upload_box_no_accession_map(
     await rig.box_dao.update(box)
 
     # Try to archive without creating an accession map
+    update_request = models.UpdateUploadBoxRequest(
+        version=box.version, state="archived"
+    )
+
     with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
-        await rig.controller.archive_research_data_upload_box(
+        await rig.controller.update_research_data_upload_box(
             box_id=box_id,
-            version=box.version,
-            data_steward_id=TEST_DS_ID,
+            request=update_request,
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
     assert "not been assigned" in str(exc_info.value)
 
 
-async def test_archive_research_data_upload_box_missing_accessions(
+async def test_archive_box_missing_accessions(
     rig: JointRig, populated_boxes: list[UUID]
 ):
     """Test that archiving with missing accessions raises ArchivalPrereqsError."""
@@ -1062,11 +1058,15 @@ async def test_archive_research_data_upload_box_missing_accessions(
     await rig.accession_map_dao.insert(accession_map)
 
     # Try to archive with missing accessions
+    update_request = models.UpdateUploadBoxRequest(
+        version=box.version, state="archived"
+    )
+
     with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
-        await rig.controller.archive_research_data_upload_box(
+        await rig.controller.update_research_data_upload_box(
             box_id=box_id,
-            version=box.version,
-            data_steward_id=TEST_DS_ID,
+            request=update_request,
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
     # Check the message in the error
@@ -1074,15 +1074,16 @@ async def test_archive_research_data_upload_box_missing_accessions(
     assert str(test_file_ids[2]) in str(exc_info.value)
 
 
-async def test_archive_research_data_upload_box_file_upload_box_version_error(
+async def test_archive_box_file_upload_box_version_error(
     rig: JointRig, populated_boxes: list[UUID]
 ):
-    """Test that a FileUploadBox version error during archival raises OutdatedInfoError."""
+    """Test that a FileUploadBox version error during archival raises VersionError and rolls back."""
     box_id = populated_boxes[0]
 
     # Lock the box
     box = await rig.box_dao.get_by_id(box_id)
     box.state = "locked"
+    original_version = box.version
     await rig.box_dao.update(box)
 
     # Create test file uploads
@@ -1105,7 +1106,7 @@ async def test_archive_research_data_upload_box_file_upload_box_version_error(
     # Mock the file box client
     rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
     rig.file_upload_box_client.archive_file_upload_box = AsyncMock(  # type: ignore
-        side_effect=FileBoxClientPort.VersionError("Version mismatch")
+        side_effect=FileBoxClientPort.FUBVersionError("Version mismatch")
     )
 
     # Create an accession map
@@ -1117,16 +1118,21 @@ async def test_archive_research_data_upload_box_file_upload_box_version_error(
     )
     await rig.accession_map_dao.insert(accession_map)
 
-    # Try to archive - should raise OutdatedInfoError due to version mismatch
-    with pytest.raises(rig.controller.OutdatedInfoError) as exc_info:
-        await rig.controller.archive_research_data_upload_box(
+    # Try to archive - should raise VersionError due to FUB version mismatch
+    update_request = models.UpdateUploadBoxRequest(
+        version=box.version, state="archived"
+    )
+
+    with pytest.raises(rig.controller.VersionError) as exc_info:
+        await rig.controller.update_research_data_upload_box(
             box_id=box_id,
-            version=box.version,
-            data_steward_id=TEST_DS_ID,
+            request=update_request,
+            auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
 
-    assert "has changed" in str(exc_info.value)
+    assert "out of date" in str(exc_info.value).lower()
 
-    # Verify the box state wasn't updated
+    # Verify the box state was rolled back
     unchanged_box = await rig.box_dao.get_by_id(box_id)
     assert unchanged_box.state == "locked"  # Still locked, not archived
+    assert unchanged_box.version == original_version  # Version rolled back

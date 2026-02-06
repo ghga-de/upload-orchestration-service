@@ -395,7 +395,7 @@ class FileBoxClient(FileBoxClientPort):
         """Archive a FileUploadBox in the owning service.
 
         Raises:
-            VersionError if the remote box version differs from `version`.
+            FUBVersionError if the remote box version differs from `version`.
             OperationError if there's any other problem with the operation.
         """
         wot = ChangeFileBoxWorkOrder(work_type="archive", box_id=box_id)
@@ -418,7 +418,9 @@ class FileBoxClient(FileBoxClientPort):
                     "response_text": response.text,
                 },
             )
-            raise self.VersionError("Requested FileUploadBox version is out of date.")
+            raise self.FUBVersionError(
+                "Requested FileUploadBox version is out of date."
+            )
         elif response.status_code != 204:
             log.error(
                 "Error archiving FileUploadBox ID %s in external service.",

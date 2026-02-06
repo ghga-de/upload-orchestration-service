@@ -32,12 +32,6 @@ from pydantic import (
 UploadBoxState = Literal["open", "locked", "archived"]
 
 
-class VersionModel(BaseModel):
-    """Model for the HTTP API to include the RDUB version number"""
-
-    version: int = Field(..., description="A counter indicating resource version")
-
-
 class ResearchDataUploadBox(BaseModel):
     """A class representing a ResearchDataUploadBox."""
 
@@ -127,6 +121,7 @@ class CreateUploadBoxResponse(BaseModel):
 class UpdateUploadBoxRequest(BaseModel):
     """Request model for updating a research data upload box."""
 
+    version: int = Field(..., description="A counter indicating resource version")
     title: str | None = Field(default=None, description="Updated title")
     description: str | None = Field(default=None, description="Updated description")
     state: UploadBoxState | None = Field(default=None, description="Updated state")

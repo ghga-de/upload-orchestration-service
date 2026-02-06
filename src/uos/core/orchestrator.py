@@ -128,12 +128,30 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Raises:
             BoxNotFoundError: If the research data upload box doesn't exist.
             BoxAccessError: If the user doesn't have access to the research data upload box.
+            VersionError: If the requested ResearchDataUploadBox version is outdated or
+                the FileUploadBox version is outdated when updating the FileUploadBox.
+            StateChangeError: If the requested state transition is invalid.
             OperationError: If there's a problem updating the corresponding FileUploadBox.
+            ArchivalPrereqsError: If trying to archive the box and prerequisites aren't met.
         """
         # Get existing box if user has access to it
         box = await self.get_research_data_upload_box(
             box_id=box_id, auth_context=auth_context
         )
+
+        # Make sure the request is not based on outdated info
+        if box.version != request.version:
+            log.error(
+                "Can't update RDUB %s because the request is outdated.",
+                box_id,
+                extra={
+                    "box_id": box_id,
+                    "current_version": box.version,
+                    "requested_version": request.version,
+                },
+            )
+            raise self.VersionError(f"Research Data Upload Box {box_id} has changed")
+
         changed_fields = {
             k: v for k, v in request.model_dump().items() if v and getattr(box, k) != v
         }
@@ -143,8 +161,6 @@ class UploadOrchestrator(UploadOrchestratorPort):
             )
             return
 
-        updated_box = box.model_copy(update=changed_fields)
-
         # If not a data steward, the only acceptable update is to move from OPEN to LOCKED
         is_ds = is_data_steward(auth_context)
         if not is_ds and not (
@@ -152,104 +168,108 @@ class UploadOrchestrator(UploadOrchestratorPort):
         ):
             raise self.BoxAccessError("Unauthorized")
 
-        # Update the research data upload box in the DB
+        # Update fields on the research data upload box instance
+        updated_box = box.model_copy(update=changed_fields)
         user_id = UUID(auth_context.id)
         updated_box.changed_by = user_id
         updated_box.last_changed = now_utc_ms_prec()
         updated_box.version += 1
 
-        # If locking or unlocking, communicate with service that owns file upload boxes
-        #  (errors handled in file_upload_box_client)
-        if box.state == "open" and updated_box.state == "locked":
-            updated_box.file_upload_box_state = "locked"
+        # If state is not changed, we can just update, emit audit log, and return
+        if "state" not in changed_fields:
             await self._box_dao.update(updated_box)
-            try:
-                await self._file_upload_box_client.lock_file_upload_box(
-                    box_id=box.file_upload_box_id
-                )
-            except Exception:
-                log.warning(
-                    "Failed to update FUB %s, rolling back changed for RDUB %s",
-                    box.file_upload_box_id,
-                    box_id,
-                )
-                await self._box_dao.update(box)
-                raise
-        elif box.state == "locked" and updated_box.state == "open":
-            updated_box.file_upload_box_state = "open"
-            await self._box_dao.update(updated_box)
-            try:
-                await self._file_upload_box_client.unlock_file_upload_box(
-                    box_id=box.file_upload_box_id
-                )
-            except Exception:
-                log.warning(
-                    "Failed to update FUB %s, rolling back changed for RDUB %s",
-                    box.file_upload_box_id,
-                    box_id,
-                )
-                await self._box_dao.update(box)
-                raise
+            await self._audit_repository.log_box_updated(
+                box=updated_box, user_id=user_id
+            )
+            return
+
+        # Make sure the state change is valid, then update attributes and local DB copy
+        self._check_state_change_is_valid(
+            old_state=box.state, new_state=updated_box.state
+        )
+        updated_box.file_upload_box_state = updated_box.state
+        updated_box.file_upload_box_version += 1
+        await self._box_dao.update(updated_box)
+
+        # Take the appropriate action for the state change and roll back if it fails
+        try:
+            await self._handle_state_change(old_box=box, updated_box=updated_box)
+        except Exception:
+            log.warning(
+                "Failed to update FUB %s, rolling back changes for RDUB %s",
+                box.file_upload_box_id,
+                box_id,
+            )
+            await self._box_dao.update(box)
+            raise
         else:
-            await self._box_dao.update(updated_box)
+            await self._audit_repository.log_box_updated(
+                box=updated_box, user_id=user_id
+            )
 
-        # Create audit record
-        await self._audit_repository.log_box_updated(box=updated_box, user_id=user_id)
+    def _check_state_change_is_valid(
+        self, *, old_state: UploadBoxState, new_state: UploadBoxState
+    ) -> None:
+        """Verify that the new state value for a box represents a valid transition.
 
-    async def archive_research_data_upload_box(
-        self,
-        *,
-        box_id: UUID4,
-        version: int,
-        data_steward_id: UUID4,
+        Raises:
+            StateChangeError: If the state transition is invalid.
+        """
+        valid = [("open", "locked"), ("locked", "open"), ("locked", "archived")]
+        if (old_state, new_state) not in valid:
+            raise self.StateChangeError(old_state=old_state, new_state=new_state)
+
+    async def _handle_state_change(
+        self, *, old_box: ResearchDataUploadBox, updated_box: ResearchDataUploadBox
+    ) -> None:
+        """Handle state change for a Research Data Upload Box and the corresponding
+        FileUploadBox.
+        """
+        rdub_id = updated_box.id
+        fub_id = updated_box.file_upload_box_id
+        match (old_box.state, updated_box.state):
+            case ("open", "locked"):  # lock the box
+                await self._file_upload_box_client.lock_file_upload_box(box_id=fub_id)
+            case ("locked", "open"):  # unlock the box
+                await self._file_upload_box_client.unlock_file_upload_box(box_id=fub_id)
+            case ("locked", "archived"):  # archive the box
+                # Check prerequisites using old version number for logging purposes
+                await self._check_archival_prerequisites(box=old_box)
+
+                # Use old box data because `updated_box` has already been, well, updated
+                try:
+                    await self._file_upload_box_client.archive_file_upload_box(
+                        box_id=fub_id, version=old_box.file_upload_box_version
+                    )
+                except FileBoxClientPort.FUBVersionError as version_err:
+                    log.error(
+                        "Can't archive RDUB %s because the associated FileUploadBox"
+                        + " version has changed.",
+                        rdub_id,
+                        extra={
+                            "box_id": rdub_id,
+                            "file_upload_box_id": fub_id,
+                            "request_file_upload_box_version": old_box.file_upload_box_version,
+                        },
+                    )
+                    raise self.VersionError(
+                        f"File Upload Box {fub_id} version is out of date."
+                    ) from version_err
+            case _:
+                # maybe we allowed a new state change but forgot to handle it here?
+                raise NotImplementedError()
+
+    async def _check_archival_prerequisites(
+        self, *, box: ResearchDataUploadBox
     ) -> None:
         """Archive a research data upload box.
 
         Raises:
-            BoxNotFoundError: If the research data upload box doesn't exist.
-            OutdatedInfoError: If the box version differs from `version`.
             ArchivalPrereqsError: If there are any files in the box that don't yet have
                 an accession assigned OR if the box is still in the 'open' state.
             OperationError: If there's a problem querying the file box service.
         """
-        # Get RDUB
-        try:
-            box = await self._box_dao.get_by_id(box_id)
-        except ResourceNotFoundError as err:
-            raise self.BoxNotFoundError(box_id=box_id) from err
-
-        # Return early (with a log) if the box has already been archived
-        if box.state == "archived":
-            log.warning(
-                "RDUB %s has already been archived.",
-                box_id,
-                extra={"box_id": box_id, "version": version},
-            )
-            return
-
-        # Make sure the request is not based on outdated info
-        if box.version != version:
-            log.error(
-                "Can't archive RDUB %s because the request is outdated.",
-                box_id,
-                extra={
-                    "box_id": box_id,
-                    "box_version": box.version,
-                    "request_version": version,
-                },
-            )
-            raise self.OutdatedInfoError(
-                f"Research Data Upload Box {box_id} has changed"
-            )
-
-        # Make sure the box is locked
-        if box.state != "locked":
-            log.error(
-                "Can't archive RDUB %s because it's still open.",
-                box_id,
-                extra={"box_id": box_id, "version": version},
-            )
-            raise self.ArchivalPrereqsError("Box must be locked before archival.")
+        box_id = box.id
 
         try:
             db_map = await self._accession_map_dao.get_by_id(box_id)
@@ -257,13 +277,13 @@ class UploadOrchestrator(UploadOrchestratorPort):
             log.error(
                 "Can't archive RDUB %s because no accession map could be found.",
                 box_id,
-                extra={"box_id": box_id, "version": version},
+                extra={"box_id": box_id, "version": box.version},
             )
             raise self.ArchivalPrereqsError(
                 "Accessions have not been assigned"
             ) from err
 
-        # Get files list from File Box API
+        # Get files list from File Box API - this always gets the latest data
         files = await self._file_upload_box_client.get_file_upload_list(
             box_id=box.file_upload_box_id
         )
@@ -279,43 +299,13 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 box_id,
                 extra={
                     "box_id": box_id,
-                    "version": version,
+                    "version": box.version,
                     "file_ids": unassigned_files,
                 },
             )
             raise self.ArchivalPrereqsError(
                 f"The following files are missing an accession: {unassigned_files}"
             )
-
-        # Trigger the FileUploadBox archival
-        try:
-            await self._file_upload_box_client.archive_file_upload_box(
-                box_id=box.file_upload_box_id, version=box.file_upload_box_version
-            )
-        except FileBoxClientPort.VersionError as version_err:
-            log.error(
-                "Can't archive RDUB %s because the associated FileUploadBox version has changed.",
-                box_id,
-                extra={
-                    "box_id": box_id,
-                    "file_upload_box_version": box.file_upload_box_version,
-                },
-            )
-            raise self.OutdatedInfoError(
-                f"File Upload Box {box.file_upload_box_id} has changed."
-            ) from version_err
-
-        # Update box attributes
-        box.version += 1
-        box.state = "archived"
-        box.last_changed = now_utc_ms_prec()
-        box.changed_by = data_steward_id
-        box.file_upload_box_version += 1
-        box.file_upload_box_state = "archived"
-        await self._box_dao.update(box)
-
-        # Publish audit event
-        await self._audit_repository.log_box_updated(box=box, user_id=data_steward_id)
 
     async def grant_upload_access(  # noqa: PLR0913
         self,

@@ -42,7 +42,6 @@ from uos.core.models import (
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
     UploadBoxState,
-    VersionModel,
 )
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
@@ -195,60 +194,16 @@ async def create_research_data_upload_box(
         raise HttpInternalError(message="Failed to create upload box") from err
 
 
-@router.post(
-    "/rpc/archive/{box_id}",
-    summary="Archive an upload box",
-    description="Archives the specified upload box. The box may no longer be modified,"
-    + " and files in the box will be moved to permanent storage. The request body must"
-    + " include the complete accession map, which is used for confirmation and thus"
-    + " cannot include any updates. If the submitted accession map does not match"
-    + " what's in the database, if any files have not been successfully re-encrypted,"
-    + " if the upload box is still 'open', or if there are any files which do not have"
-    + " an assigned accession number, archival will be denied. Only Data Stewards may"
-    + " perform this operation.",
-    tags=TAGS,
-    response_model=None,
-    status_code=status.HTTP_204_NO_CONTENT,
-    responses={
-        204: {"description": "Upload box archival successfully initiated."},
-        403: {"description": "Access denied."},
-        404: {"description": "Upload box not found."},
-        409: {"description": "Request is outdated."},
-        422: {"description": "Validation error in request body."},
-    },
-)
-@TRACER.start_as_current_span("routes.archive_research_data_upload_box")
-async def archive_research_data_upload_box(
-    box_id: UUID4,
-    request: VersionModel,
-    upload_service: UploadOrchestratorDummy,
-    auth_context: StewardAuthContext,
-) -> None:
-    """Archive a ResearchDataUploadBox"""
-    try:
-        await upload_service.archive_research_data_upload_box(
-            box_id=box_id,
-            version=request.version,
-            data_steward_id=UUID(auth_context.id),
-        )
-    except UploadOrchestratorPort.BoxNotFoundError as err:
-        raise HttpBoxNotFoundError(box_id=box_id) from err
-    except UploadOrchestratorPort.OutdatedInfoError as err:
-        raise HTTPException(status_code=409, detail=str(err)) from err
-    except UploadOrchestratorPort.ArchivalPrereqsError as err:
-        raise HTTPException(status_code=409, detail=str(err)) from err
-    except Exception as err:
-        log.error(err, exc_info=True)
-        raise HttpInternalError(message="Failed to archive upload box") from err
-
-
 @router.patch(
     "/boxes/{box_id}",
     summary="Update upload box",
     description="Update modifiable details for a research data upload box, including"
     + " the description, title, and state. When modifying the state, users are only"
     + " allowed to move the state from OPEN to LOCKED, and all other changes are"
-    + " restricted to Data Stewards.",
+    + " restricted to Data Stewards. A note on archival: Once archived, the box may"
+    + " no longer be modified, and files in the box will be moved to permanent storage."
+    + " If any files in the box have yet to be re-encrypted, if the box is still open,"
+    + " or if there are any files that lack an accession number, archival is denied.",
     tags=TAGS,
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
@@ -256,6 +211,7 @@ async def archive_research_data_upload_box(
         204: {"description": "Upload box updated successfully."},
         403: {"description": "Access denied."},
         404: {"description": "Upload box not found."},
+        409: {"description": "Request is outdated."},
         422: {"description": "Validation error in request body."},
     },
 )
@@ -275,6 +231,12 @@ async def update_research_data_upload_box(
         raise HttpNotAuthorizedError() from err
     except UploadOrchestratorPort.BoxNotFoundError as err:
         raise HttpBoxNotFoundError(box_id=box_id) from err
+    except (
+        UploadOrchestratorPort.ArchivalPrereqsError,
+        UploadOrchestratorPort.VersionError,
+        UploadOrchestratorPort.StateChangeError,
+    ) as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
     except Exception as err:
         log.error(err, exc_info=True)
         raise HttpInternalError(message="Failed to update upload box") from err

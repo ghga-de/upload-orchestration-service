@@ -59,10 +59,22 @@ class UploadOrchestratorPort(ABC):
     class ArchivalPrereqsError(RuntimeError):
         """Raised when the pre-requisites for box archival are not met."""
 
-    class OutdatedInfoError(RuntimeError):
+    class VersionError(RuntimeError):
         """Raised when changes to a resource can't be made because the request
         references a version of the resource that is not current.
         """
+
+    class StateChangeError(RuntimeError):
+        """Raised when there is an attempt to make an invalid state change for
+        a Research Data Upload Box.
+        """
+
+        def __init__(self, *, old_state: UploadBoxState, new_state: UploadBoxState):
+            msg = (
+                f"Research Data Upload Boxes cannot be changed from '{old_state}'"
+                + f" to '{new_state}'."
+            )
+            super().__init__(msg)
 
     @abstractmethod
     async def create_research_data_upload_box(
@@ -101,26 +113,11 @@ class UploadOrchestratorPort(ABC):
         Raises:
             BoxNotFoundError: If the research data upload box doesn't exist.
             BoxAccessError: If the user doesn't have access to the research data upload box.
+            VersionError: If the requested ResearchDataUploadBox version is outdated or
+                the FileUploadBox version is outdated when updating the FileUploadBox.
+            StateChangeError: If the requested state transition is invalid.
             OperationError: If there's a problem updating the corresponding FileUploadBox.
-        """
-        ...
-
-    @abstractmethod
-    async def archive_research_data_upload_box(
-        self,
-        *,
-        box_id: UUID4,
-        version: int,
-        data_steward_id: UUID4,
-    ) -> None:
-        """Archive a research data upload box.
-
-        Raises:
-            BoxNotFoundError: If the research data upload box doesn't exist.
-            OutdatedInfoError: If the box version differs from `version`.
-            ArchivalPrereqsError: If there are any files in the box that don't yet have
-                an accession assigned OR if the box is still in the 'open' state.
-            OperationError: If there's a problem querying the file box service.
+            ArchivalPrereqsError: If trying to archive the box and prerequisites aren't met.
         """
         ...
 

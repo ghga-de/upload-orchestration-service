@@ -102,7 +102,7 @@ class FileBoxClientPort(ABC):
     class OperationError(RuntimeError):
         """Raised when there's an error while communicating with the service"""
 
-    class VersionError(RuntimeError):
+    class FUBVersionError(RuntimeError):
         """Raised when the requested version of a FileUploadBox is out of date."""
 
     @abstractmethod
@@ -148,7 +148,7 @@ class FileBoxClientPort(ABC):
         """Archive a FileUploadBox in the owning service.
 
         Raises:
-            VersionError if the remote box version differs from `version`.
+            FUBVersionError if the remote box version differs from `version`.
             OperationError if there's any other problem with the operation.
         """
         ...
