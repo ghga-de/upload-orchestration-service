@@ -22,7 +22,7 @@ from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
 from uos.core.models import (
-    AccessionMap,
+    AccessionMapRequest,
     BoxRetrievalResults,
     FileUploadBox,
     FileUploadWithAccession,
@@ -232,7 +232,9 @@ class UploadOrchestratorPort(ABC):
         ...
 
     @abstractmethod
-    async def update_accession_map(self, *, accession_map: AccessionMap) -> None:
+    async def update_accession_map(
+        self, *, box_id: UUID4, request: AccessionMapRequest
+    ) -> None:
         """Update the file accession map for a given box.
 
         This method makes a call to the File Box API to get the latest list of
@@ -243,7 +245,9 @@ class UploadOrchestratorPort(ABC):
 
         Raises:
             BoxNotFoundError: If the box doesn't exist
-            AccessionMapError: If the accession map includes a file ID that doesn't
-                exist or if there are duplicate accessions.
+            VersionError: If the requested ResearchDataUploadBox version is outdated
+            AccessionMapError: If the box is already archived, if the accession map
+                includes a file ID that doesn't exist in the box, if any files are
+                specified more than once.
         """
         ...

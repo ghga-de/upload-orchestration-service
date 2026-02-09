@@ -15,7 +15,7 @@
 
 """Data models for the Upload Orchestration Service."""
 
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import uuid4
 
 from ghga_service_commons.utils.utc_dates import UTCDatetime
@@ -25,6 +25,7 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
+    StringConstraints,
     ValidationInfo,
     field_validator,
 )
@@ -191,20 +192,26 @@ class BoxRetrievalResults(BaseModel):
     )
 
 
-class FileIdToAccession(BaseModel):
-    """Mapping of file ID to accession for a single file"""
+Accession = Annotated[str, StringConstraints(pattern=r"^GHGA.+")]
 
-    file_id: UUID4
-    accession: str
+
+class AccessionMapRequest(BaseModel):
+    """The request body schema for submitting accession maps"""
+
+    version: int = Field(
+        ..., description="A counter indicating research data upload box version"
+    )
+    mapping: dict[Accession, UUID4] = Field(
+        default=..., description="Map of accessions to file IDs"
+    )
 
 
 class AccessionMap(BaseModel):
     """A map of file IDs to accession numbers for a box"""
 
     box_id: UUID4 = Field(..., description="ID of the RDUB this accession map is for")
-    mappings: list[FileIdToAccession] = Field(
-        ...,
-        description="A list of items where each contains a file_id and accession",
+    mapping: dict[Accession, UUID4] = Field(
+        default=..., description="Map of accessions to file IDs"
     )
 
 

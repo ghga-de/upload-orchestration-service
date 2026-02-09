@@ -683,58 +683,32 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
     rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
 
     # Create an accession map
-    accession_map = models.AccessionMap(
-        box_id=box_id,
-        mappings=[
-            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
-            models.FileIdToAccession(file_id=test_file_ids[1], accession="TEST2"),
-            models.FileIdToAccession(file_id=test_file_ids[2], accession="TEST3"),
-        ],
+    accession_map = models.AccessionMapRequest(
+        version=0,
+        mapping={
+            "GHGA001": test_file_ids[0],
+            "GHGA002": test_file_ids[1],
+            "GHGA003": test_file_ids[2],
+        },
     )
 
-    # Verify that a BoxNotFoundError is raised if the map points to a non-existent box
-    bad_map = accession_map.model_copy(update={"box_id": uuid4()})
+    # Verify that a BoxNotFoundError is raised for a non-existent box
     with pytest.raises(rig.controller.BoxNotFoundError):
-        await rig.controller.update_accession_map(accession_map=bad_map)
+        await rig.controller.update_accession_map(box_id=uuid4(), request=accession_map)
 
     # Verify file box client was not called
     rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
 
     # Call the method with the valid map now
-    await rig.controller.update_accession_map(accession_map=accession_map)
+    await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
 
     # Verify the accession map was stored
     stored_map = await rig.accession_map_dao.get_by_id(box_id)
     assert stored_map.box_id == box_id
-    assert len(stored_map.mappings) == 3
+    assert len(stored_map.mapping) == 3
 
     # Verify file box client was called
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
-
-
-async def test_update_accession_map_duplicate_accessions(
-    rig: JointRig, populated_boxes: list[UUID]
-):
-    """Test that duplicate accessions in a map raise AccessionMapError."""
-    box_id = populated_boxes[0]
-
-    # Create an accession map with duplicate accessions
-    accession_map = models.AccessionMap(
-        box_id=box_id,
-        mappings=[
-            models.FileIdToAccession(file_id=uuid4(), accession="TEST1"),
-            models.FileIdToAccession(file_id=uuid4(), accession="TEST1"),  # Duplicate!
-        ],
-    )
-
-    # This should raise AccessionMapError due to duplicate accessions
-    with pytest.raises(rig.controller.AccessionMapError) as exc_info:
-        await rig.controller.update_accession_map(accession_map=accession_map)
-
-    assert "Duplicate accessions" in str(exc_info.value)
-
-    # Verify file box client was NOT called
-    rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
 
 
 async def test_update_accession_map_invalid_file_ids(
@@ -766,17 +740,13 @@ async def test_update_accession_map_invalid_file_ids(
 
     # Create an accession map with a file ID that doesn't exist in the box
     invalid_file_id = uuid4()
-    accession_map = models.AccessionMap(
-        box_id=box_id,
-        mappings=[
-            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
-            models.FileIdToAccession(file_id=invalid_file_id, accession="TEST2"),
-        ],
+    accession_map = models.AccessionMapRequest(
+        version=0, mapping={"GHGA001": test_file_ids[0], "GHGA002": invalid_file_id}
     )
 
     # Should raise AccessionMapError
     with pytest.raises(rig.controller.AccessionMapError) as exc_info:
-        await rig.controller.update_accession_map(accession_map=accession_map)
+        await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
 
     assert "not in the box" in str(exc_info.value)
 
@@ -847,20 +817,16 @@ async def test_update_accession_map_filters_cancelled_and_failed(
     rig.file_upload_box_client.get_file_upload_list.return_value = test_file_uploads  # type: ignore
 
     # Create an accession map for only the valid files
-    accession_map = models.AccessionMap(
-        box_id=box_id,
-        mappings=[
-            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
-            models.FileIdToAccession(file_id=test_file_ids[3], accession="TEST2"),
-        ],
+    request = models.AccessionMapRequest(
+        version=0, mapping={"GHGA001": test_file_ids[0], "GHGA004": test_file_ids[3]}
     )
 
     # This should succeed because cancelled and failed files are ignored
-    await rig.controller.update_accession_map(accession_map=accession_map)
+    await rig.controller.update_accession_map(box_id=box_id, request=request)
 
     # Verify the accession map was stored
     stored_map = await rig.accession_map_dao.get_by_id(box_id)
-    assert len(stored_map.mappings) == 2
+    assert len(stored_map.mapping) == 2
 
 
 async def test_archive_research_data_upload_box_happy(
@@ -900,10 +866,7 @@ async def test_archive_research_data_upload_box_happy(
     # Create an accession map
     accession_map = models.AccessionMap(
         box_id=box_id,
-        mappings=[
-            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
-            models.FileIdToAccession(file_id=test_file_ids[1], accession="TEST2"),
-        ],
+        mapping={"GHGA001": test_file_ids[0], "GHGA002": test_file_ids[1]},
     )
     await rig.accession_map_dao.insert(accession_map)
 
@@ -1050,10 +1013,7 @@ async def test_archive_box_missing_accessions(
     # Create an incomplete accession map (missing the third file)
     accession_map = models.AccessionMap(
         box_id=box_id,
-        mappings=[
-            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
-            models.FileIdToAccession(file_id=test_file_ids[1], accession="TEST2"),
-        ],
+        mapping={"GHGA001": test_file_ids[0], "GHGA002": test_file_ids[1]},
     )
     await rig.accession_map_dao.insert(accession_map)
 
@@ -1111,10 +1071,7 @@ async def test_archive_box_file_upload_box_version_error(
 
     # Create an accession map
     accession_map = models.AccessionMap(
-        box_id=box_id,
-        mappings=[
-            models.FileIdToAccession(file_id=test_file_ids[0], accession="TEST1"),
-        ],
+        box_id=box_id, mapping={"GHGA001": test_file_ids[0]}
     )
     await rig.accession_map_dao.insert(accession_map)
 

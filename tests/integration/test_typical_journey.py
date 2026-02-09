@@ -25,7 +25,7 @@ from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
-from uos.core.models import AccessionMap, FileIdToAccession, UpdateUploadBoxRequest
+from uos.core.models import AccessionMapRequest, UpdateUploadBoxRequest
 
 pytestmark = pytest.mark.asyncio()
 
@@ -203,7 +203,8 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         box_id=box_id,
         auth_context=user_auth_context,
     )
-    assert final_box.state == "locked"
+    assert final_box.state == final_box.file_upload_box_state == "locked"
+    assert final_box.version == 3
 
     # Submit accession map
     # Create test file IDs for files in the box
@@ -257,16 +258,12 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     )
 
     # Submit an accession map
-    accession_map = AccessionMap(
-        box_id=box_id,
-        mappings=[
-            FileIdToAccession(file_id=file_id_1, accession="EGAF00000000001"),
-            FileIdToAccession(file_id=file_id_2, accession="EGAF00000000002"),
-            FileIdToAccession(file_id=file_id_3, accession="EGAF00000000003"),
-        ],
+    accession_map = AccessionMapRequest(
+        version=3,
+        mapping={"GHGA001": file_id_1, "GHGA002": file_id_2, "GHGA003": file_id_3},
     )
     await joint_fixture.upload_orchestrator.update_accession_map(
-        accession_map=accession_map
+        box_id=box_id, request=accession_map
     )
 
     # Mock the archive endpoint

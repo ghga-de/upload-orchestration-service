@@ -23,16 +23,16 @@ from pydantic import UUID4
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
-from uos.core.models import AccessionMap, FileIdToAccession, FileUploadWithAccession
+from uos.core.models import AccessionMapRequest, FileUploadWithAccession
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
 
 def make_file_upload(
-    *, box_id: UUID4, file_id: UUID4 = uuid4()
+    *, box_id: UUID4, file_id: UUID4 | None = None
 ) -> FileUploadWithAccession:
     """Make a FileUpload instance"""
     return FileUploadWithAccession(
-        id=file_id,
+        id=file_id or uuid4(),
         box_id=box_id,
         alias="file1",
         state="inbox",
@@ -104,67 +104,41 @@ async def test_accession_map_index(joint_fixture: JointFixture, httpx_mock: HTTP
         json=[file_upload3.model_dump(mode="json")],
     )
 
-    # Make accession map with a local duplicate accession
-    map_local_dupe = AccessionMap(
-        box_id=rdub_id1,
-        mappings=[
-            FileIdToAccession(file_id=file_upload1.id, accession="FILE1"),
-            FileIdToAccession(file_id=file_upload2.id, accession="FILE1"),
-        ],
+    # Make accession map with a duplicate file ID
+    map_dupe_file = AccessionMapRequest(
+        version=0,
+        mapping={"GHGA001": file_upload1.id, "GHGA002": file_upload1.id},
     )
     with pytest.raises(UploadOrchestratorPort.AccessionMapError):
         await joint_fixture.upload_orchestrator.update_accession_map(
-            accession_map=map_local_dupe
+            box_id=rdub_id1, request=map_dupe_file
         )
 
     # Make accession map with a file ID that doesn't belong
-    map_no_such_file = AccessionMap(
-        box_id=rdub_id1,
-        mappings=[
-            FileIdToAccession(file_id=file_upload3.id, accession="FILE1"),
-        ],
-    )
-    await joint_fixture.upload_orchestrator.update_accession_map(
-        accession_map=map_no_such_file
-    )
-
-    # Update database for rdub2's only file
-    map_for_rdub2 = AccessionMap(
-        box_id=rdub_id2,
-        mappings=[
-            FileIdToAccession(file_id=file_upload3.id, accession="FILE3"),
-        ],
-    )
-    await joint_fixture.upload_orchestrator.update_accession_map(
-        accession_map=map_for_rdub2
-    )
-
-    # Make accession map with a global duplicate accession
-    map_global_dupe = AccessionMap(
-        box_id=rdub_id1,
-        mappings=[
-            FileIdToAccession(file_id=file_upload1.id, accession="FILE3"),
-        ],
+    map_no_such_file = AccessionMapRequest(
+        version=0, mapping={"GHGA003": file_upload3.id}
     )
     with pytest.raises(UploadOrchestratorPort.AccessionMapError):
         await joint_fixture.upload_orchestrator.update_accession_map(
-            accession_map=map_global_dupe
+            box_id=rdub_id1, request=map_no_such_file
         )
 
+    # Update database for rdub2's only file
+    map_for_rdub2 = AccessionMapRequest(version=0, mapping={"GHGA003": file_upload3.id})
+    await joint_fixture.upload_orchestrator.update_accession_map(
+        box_id=rdub_id2, request=map_for_rdub2
+    )
+
     # Successfully insert map for rdub1
-    map_for_rdub1 = AccessionMap(
-        box_id=rdub_id1,
-        mappings=[
-            FileIdToAccession(file_id=file_upload1.id, accession="FILE1"),
-            FileIdToAccession(file_id=file_upload2.id, accession="FILE2"),
-        ],
+    map_for_rdub1 = AccessionMapRequest(
+        version=0, mapping={"GHGA001": file_upload1.id, "GHGA002": file_upload2.id}
     )
     await joint_fixture.upload_orchestrator.update_accession_map(
-        accession_map=map_for_rdub1
+        box_id=rdub_id1, request=map_for_rdub1
     )
 
     # Confirm that we can update this mapping
-    map_for_rdub1.mappings[0].accession = "FILE1UPDATED"
+    map_for_rdub1.mapping["GHGA007"] = map_for_rdub1.mapping.pop("GHGA001")
     await joint_fixture.upload_orchestrator.update_accession_map(
-        accession_map=map_for_rdub1
+        box_id=rdub_id1, request=map_for_rdub1
     )

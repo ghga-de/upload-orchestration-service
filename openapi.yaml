@@ -1,23 +1,24 @@
 components:
   schemas:
-    AccessionMap:
-      description: A map of file IDs to accession numbers for a box
+    AccessionMapRequest:
+      description: The request body schema for submitting accession maps
       properties:
-        box_id:
-          description: ID of the RDUB this accession map is for
-          format: uuid4
-          title: Box Id
-          type: string
-        mappings:
-          description: A list of items where each contains a file_id and accession
-          items:
-            $ref: '#/components/schemas/FileIdToAccession'
-          title: Mappings
-          type: array
+        mapping:
+          description: Map of accessions to file IDs
+          patternProperties:
+            ^GHGA.+:
+              format: uuid4
+              type: string
+          title: Mapping
+          type: object
+        version:
+          description: A counter indicating research data upload box version
+          title: Version
+          type: integer
       required:
-      - box_id
-      - mappings
-      title: AccessionMap
+      - version
+      - mapping
+      title: AccessionMapRequest
       type: object
     BoxRetrievalResults:
       description: A model encapsulating retrieved research data upload boxes and
@@ -60,21 +61,6 @@ components:
       - description
       - storage_alias
       title: CreateUploadBoxRequest
-      type: object
-    FileIdToAccession:
-      description: Mapping of file ID to accession for a single file
-      properties:
-        accession:
-          title: Accession
-          type: string
-        file_id:
-          format: uuid4
-          title: File Id
-          type: string
-      required:
-      - file_id
-      - accession
-      title: FileIdToAccession
       type: object
     FileUploadWithAccession:
       description: A FileUpload with its accession
@@ -748,7 +734,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AccessionMap'
+              $ref: '#/components/schemas/AccessionMapRequest'
         required: true
       responses:
         '204':
@@ -759,6 +745,8 @@ paths:
           description: Not authorized.
         '404':
           description: Upload box not found.
+        '409':
+          description: The version of the requested box is out of date.
         '422':
           description: Validation error in request body.
       security:

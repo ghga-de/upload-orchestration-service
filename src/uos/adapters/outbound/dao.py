@@ -58,10 +58,5 @@ async def get_accession_map_dao(*, dao_factory: DaoFactoryProtocol) -> Accession
     A unique index over mapping.accession is created.
     """
     return await dao_factory.get_dao(
-        name=ACCESSION_MAPS_COLLECTION,
-        dto_model=AccessionMap,
-        id_field="box_id",
-        indexes=[
-            MongoDbIndex(fields="mappings.accession", properties={"unique": True})
-        ],
+        name=ACCESSION_MAPS_COLLECTION, dto_model=AccessionMap, id_field="box_id"
     )

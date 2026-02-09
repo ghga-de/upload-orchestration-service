@@ -760,11 +760,8 @@ async def test_submit_accession_map(
     ):
         url = f"/boxes/{TEST_BOX_ID}/accessions"
         request_data = {
-            "box_id": str(TEST_BOX_ID),
-            "mappings": [
-                {"file_id": str(uuid4()), "accession": "ACC001"},
-                {"file_id": str(uuid4()), "accession": "ACC002"},
-            ],
+            "version": 0,
+            "mapping": {"GHGA001": str(uuid4()), "GHGA002": str(uuid4())},
         }
 
         # unauthenticated

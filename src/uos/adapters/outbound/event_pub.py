@@ -61,10 +61,7 @@ class EventPubTranslator(EventPublisherPort):
         """Publish a file accession map"""
         # Publish as slimmer mapping of file ID to accession
         await self._provider.publish(
-            payload={
-                str(mapping.file_id): mapping.accession
-                for mapping in accession_map.mappings
-            },
+            payload=accession_map.mapping,
             type_=self._config.accession_map_type,
             topic=self._config.accession_map_topic,
             key=f"uos-box-{accession_map.box_id}",  # use box ID as key for compaction

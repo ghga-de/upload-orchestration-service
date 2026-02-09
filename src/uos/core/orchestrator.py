@@ -31,6 +31,7 @@ from pydantic import UUID4
 from uos.constants import VALID_STATE_TRANSITIONS
 from uos.core.models import (
     AccessionMap,
+    AccessionMapRequest,
     BoxRetrievalResults,
     FileUploadBox,
     FileUploadWithAccession,
@@ -290,7 +291,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Make sure all files have an accession number
         file_ids_in_box = set(f.id for f in files)
-        file_ids_in_map = set(mapping.file_id for mapping in db_map.mappings)
+        file_ids_in_map = set(db_map.mapping.values())
         unassigned_files = file_ids_in_box - file_ids_in_map
 
         if unassigned_files:
@@ -444,7 +445,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
         except ResourceNotFoundError:
             log.warning("No accession map found for box ID %s", box_id)
         else:
-            acc_dict = {item.file_id: item.accession for item in accessions.mappings}
+            # Invert the dictionary so we can look up accession by file ID
+            acc_dict = {v: k for k, v in accessions.mapping.items()}
             for i in range(len(file_uploads)):
                 file_id = file_uploads[i].id
                 if file_id in acc_dict:
@@ -596,7 +598,9 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         return BoxRetrievalResults(count=count, boxes=boxes)
 
-    async def update_accession_map(self, *, accession_map: AccessionMap) -> None:
+    async def update_accession_map(
+        self, *, box_id: UUID4, request: AccessionMapRequest
+    ) -> None:
         """Update the file accession map for a given box.
 
         This method makes a call to the File Box API to get the latest list of
@@ -607,15 +611,26 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         Raises:
             BoxNotFoundError: If the box doesn't exist
-            AccessionMapError: If the accession map includes a file ID that doesn't
-                exist or if there are duplicate accessions.
+            VersionError: If the requested ResearchDataUploadBox version is outdated
+            AccessionMapError: If the box is already archived, if the accession map
+                includes a file ID that doesn't exist in the box, if any files are
+                specified more than once.
         """
         # Make sure the box exists
-        box_id = accession_map.box_id
         try:
             box = await self._box_dao.get_by_id(box_id)
         except ResourceNotFoundError as err:
             raise self.BoxNotFoundError(box_id=box_id) from err
+
+        if request.version != box.version:
+            log.error(
+                "Accession Map update request specified version %i for RDUB %s, but"
+                + " the current version is %i.",
+                request.version,
+                box_id,
+                box.version,
+            )
+            raise self.VersionError("Research Data Upload Box has changed.")
 
         # Don't allow changes to archived boxes
         if box.state == "archived":
@@ -627,33 +642,34 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 "Data already archived - accessions cannot be modified."
             )
 
-        # Check for duplicate accession numbers within this set before storing
-        accessions = set(mapping.accession for mapping in accession_map.mappings)
-        if len(accessions) < len(accession_map.mappings):
-            raise self.AccessionMapError("Duplicate accessions detected in mapping")
+        # Make sure all file IDs are only specified once
+        unique_file_ids = set(request.mapping.values())
+        if dupe_count := (len(request.mapping.values()) - len(unique_file_ids)):
+            raise self.AccessionMapError(
+                f"Detected {dupe_count} file ID(s) specified more than once."
+            )
 
         # Get files list from File Box API
         files = await self._file_upload_box_client.get_file_upload_list(
             box_id=box.file_upload_box_id
         )
 
-        files = [f for f in files if f.state not in ("cancelled", "failed")]
-        file_ids_in_box = set(f.id for f in files)
-        file_ids_in_map = set(mapping.file_id for mapping in accession_map.mappings)
-        invalid_ids = file_ids_in_map - file_ids_in_box
-
+        # Make sure all specified file IDs are active uploads in the box
+        file_ids_in_box = set(
+            f.id for f in files if f.state not in ("cancelled", "failed")
+        )
+        invalid_ids = unique_file_ids - file_ids_in_box
         if invalid_ids:
             raise self.AccessionMapError(
                 "Invalid accession map. These file IDs are not in the box:"
                 + f" {', '.join(map(str, invalid_ids))}"
             )
 
+        # Store the data
+        accession_mapping = AccessionMap(box_id=box_id, mapping=request.mapping)
         try:
-            await self._accession_map_dao.upsert(accession_map)
+            await self._accession_map_dao.upsert(accession_mapping)
         except UniqueConstraintViolationError as err:
-            error = self.AccessionMapError(
-                "Failed to update accession mapping. At least one accession included"
-                + " in the supplied mapping already exists in the database."
-            )
-            log.error(error, extra={"box_id": accession_map.box_id})
+            error = self.AccessionMapError("Accessions must be globally unique.")
+            log.error(error, extra={"box_id": box_id})
             raise error from err
