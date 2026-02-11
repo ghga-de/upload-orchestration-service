@@ -236,6 +236,7 @@ class UploadOrchestratorPort(ABC):
         self, *, box_id: UUID4, request: AccessionMapRequest
     ) -> None:
         """Update the file accession map for a given box and publish an outbox event.
+        This results in a version increment for the ResearchDataUploadBox.
 
         **Files with a state of *cancelled* or *failed* are ignored.**
 
@@ -256,8 +257,11 @@ class UploadOrchestratorPort(ABC):
         Raises:
             BoxNotFoundError: If the box doesn't exist
             VersionError: If the requested ResearchDataUploadBox version is outdated
-            AccessionMapError: If the box is already archived, if the accession map
-                includes a file ID that doesn't exist in the box, if any files are
-                specified more than once, or if any files in the box are left unmapped.
+            AccessionMapError: If
+            - the box is already archived, or
+            - the accession map includes a file ID that doesn't exist in the box, or
+            - any files are specified more than once, or
+            - any files in the box are left unmapped, or
+            - an unexpected database error occurs while upserting the accession map.
         """
         ...

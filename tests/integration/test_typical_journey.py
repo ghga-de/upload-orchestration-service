@@ -51,6 +51,9 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     audit_topic = joint_fixture.config.audit_record_topic
     research_box_topic = joint_fixture.config.research_data_upload_box_topic
 
+    # Shorthand reference to the orchestrator
+    orchestrator = joint_fixture.upload_orchestrator
+
     # Create auth contexts
     iat = now_utc_ms_prec() - timedelta(hours=1)
 
@@ -84,13 +87,11 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
             in_topic=research_box_topic
         ) as box_event_recorder,
     ):
-        box_id = (
-            await joint_fixture.upload_orchestrator.create_research_data_upload_box(
-                title="Test Box",
-                description="A test upload box",
-                storage_alias="test-storage",
-                data_steward_id=ds_user_id,
-            )
+        box_id = await orchestrator.create_research_data_upload_box(
+            title="Test Box",
+            description="A test upload box",
+            storage_alias="test-storage",
+            data_steward_id=ds_user_id,
         )
     assert audit_event_recorder.recorded_events
     audit_event = audit_event_recorder.recorded_events[0]
@@ -108,7 +109,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     )
     valid_from = now_utc_ms_prec()
     valid_until = now_utc_ms_prec() + timedelta(days=7)
-    await joint_fixture.upload_orchestrator.grant_upload_access(
+    await orchestrator.grant_upload_access(
         user_id=regular_user_id,
         iva_id=iva_id,
         box_id=box_id,
@@ -129,7 +130,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
             in_topic=research_box_topic
         ) as box_event_recorder,
     ):
-        await joint_fixture.upload_orchestrator.update_research_data_upload_box(
+        await orchestrator.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
             auth_context=ds_auth_context,
@@ -174,7 +175,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         url=f"{access_url}/upload-access/users/{regular_user_id}/boxes/{box_id}",
         status_code=200,
     )
-    updated_box = await joint_fixture.upload_orchestrator.get_research_data_upload_box(
+    updated_box = await orchestrator.get_research_data_upload_box(
         box_id=box_id,
         auth_context=user_auth_context,
     )
@@ -192,19 +193,19 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         url=f"{file_box_service_url}/boxes/{file_upload_box_id}",
         status_code=204,
     )
-    await joint_fixture.upload_orchestrator.update_research_data_upload_box(
+    await orchestrator.update_research_data_upload_box(
         box_id=box_id,
         request=lock_request,
         auth_context=user_auth_context,
     )
 
     # Verify the box is now locked
-    final_box = await joint_fixture.upload_orchestrator.get_research_data_upload_box(
+    box_after_lock = await orchestrator.get_research_data_upload_box(
         box_id=box_id,
         auth_context=user_auth_context,
     )
-    assert final_box.state == final_box.file_upload_box_state == "locked"
-    assert final_box.version == 3
+    assert box_after_lock.state == box_after_lock.file_upload_box_state == "locked"
+    assert box_after_lock.version == 3
 
     # Submit accession map
     # Create test file IDs for files in the box
@@ -259,15 +260,13 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
 
     # Submit an accession map
     accession_map = AccessionMapRequest(
-        version=3,
+        version=box_after_lock.version,
         mapping={"GHGA001": file_id_1, "GHGA002": file_id_2, "GHGA003": file_id_3},
     )
     async with joint_fixture.kafka.record_events(
         in_topic=joint_fixture.config.accession_map_topic
     ) as accession_event_recorder:
-        await joint_fixture.upload_orchestrator.update_accession_map(
-            box_id=box_id, request=accession_map
-        )
+        await orchestrator.update_accession_map(box_id=box_id, request=accession_map)
 
     # Verify the updated accession map was published
     assert accession_event_recorder.recorded_events
@@ -279,7 +278,14 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         accession_map_event.payload == accession_map.model_dump(mode="json")["mapping"]
     )
 
-    # Mock the archive endpoint
+    # Make sure the RDUB version was bumped by the accession map update
+    box_after_mapping = await orchestrator.get_research_data_upload_box(
+        box_id=box_id,
+        auth_context=user_auth_context,
+    )
+    assert box_after_mapping.version == 4
+
+    # Mock the archive endpoint of the UCS
     httpx_mock.add_response(
         method="PATCH",
         url=f"{file_box_service_url}/boxes/{file_upload_box_id}",
@@ -288,7 +294,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
 
     # Archive the box via update
     archive_request = UpdateUploadBoxRequest(
-        version=final_box.version, state="archived"
+        version=box_after_mapping.version, state="archived"
     )
 
     async with (
@@ -297,7 +303,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
             in_topic=research_box_topic
         ) as box_event_recorder,
     ):
-        await joint_fixture.upload_orchestrator.update_research_data_upload_box(
+        await orchestrator.update_research_data_upload_box(
             box_id=box_id,
             request=archive_request,
             auth_context=ds_auth_context,
@@ -312,10 +318,10 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     assert box_event_recorder.recorded_events[0].payload["state"] == "archived"
 
     # Verify the box is now archived
-    archived_box = await joint_fixture.upload_orchestrator.get_research_data_upload_box(
+    archived_box = await orchestrator.get_research_data_upload_box(
         box_id=box_id,
         auth_context=ds_auth_context,
     )
     assert archived_box.state == "archived"
     assert archived_box.file_upload_box_state == "archived"
-    assert archived_box.version == final_box.version + 1
+    assert archived_box.version == box_after_mapping.version + 1

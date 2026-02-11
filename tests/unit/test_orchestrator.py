@@ -699,6 +699,10 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
     # Verify file box client was not called
     rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
 
+    # Get current box ID
+    box = await rig.box_dao.get_by_id(box_id)
+    version_pre_update = box.version
+
     # Call the method with the valid map now
     await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
 
@@ -706,6 +710,10 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
     stored_map = await rig.accession_map_dao.get_by_id(box_id)
     assert stored_map.box_id == box_id
     assert len(stored_map.mapping) == 3
+
+    # Verify the research data upload box version was incremented
+    box = await rig.box_dao.get_by_id(box_id)
+    assert box.version - version_pre_update == 1
 
     # Verify file box client was called
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore

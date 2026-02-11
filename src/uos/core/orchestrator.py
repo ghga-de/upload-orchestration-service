@@ -20,7 +20,7 @@ from uuid import UUID
 
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
-from hexkit.protocols.dao import NoHitsFoundError, ResourceNotFoundError
+from hexkit.protocols.dao import DaoError, NoHitsFoundError, ResourceNotFoundError
 from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
@@ -598,6 +598,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         self, *, box_id: UUID4, request: AccessionMapRequest
     ) -> None:
         """Update the file accession map for a given box and publish an outbox event.
+        This results in a version increment for the ResearchDataUploadBox.
 
         **Files with a state of *cancelled* or *failed* are ignored.**
 
@@ -618,9 +619,12 @@ class UploadOrchestrator(UploadOrchestratorPort):
         Raises:
             BoxNotFoundError: If the box doesn't exist
             VersionError: If the requested ResearchDataUploadBox version is outdated
-            AccessionMapError: If the box is already archived, if the accession map
-                includes a file ID that doesn't exist in the box, if any files are
-                specified more than once, or if any files in the box are left unmapped.
+            AccessionMapError: If
+            - the box is already archived, or
+            - the accession map includes a file ID that doesn't exist in the box, or
+            - any files are specified more than once, or
+            - any files in the box are left unmapped, or
+            - an unexpected database error occurs while upserting the accession map.
         """
         # Make sure the box exists
         try:
@@ -706,7 +710,24 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 f" {', '.join(map(str, unmapped_ids))}."
             )
 
-        # Store the data and publish an outbox event
-        accession_mapping = AccessionMap(box_id=box_id, mapping=request.mapping)
-        await self._accession_map_dao.upsert(accession_mapping)
-        log.info("Accession map upserted for RDUB %s", box_id)
+        try:
+            # Store the data and publish an outbox event
+            accession_mapping = AccessionMap(box_id=box_id, mapping=request.mapping)
+            await self._accession_map_dao.upsert(accession_mapping)
+            log.info("Accession map upserted for RDUB %s", box_id)
+        except DaoError as err:
+            log.error(
+                "Unexpected database error prevented accession map upsert for box %s",
+                box_id,
+                exc_info=True,
+                extra={
+                    "rdub_id": box_id,
+                    "rdub_version": box.version,
+                    "fub_id": box.file_upload_box_id,
+                },
+            )
+            raise self.AccessionMapError("Failed to update accession map.") from err
+        else:
+            # Bump the RDUB version number
+            updated_box = box.model_copy(update={"version": box.version + 1})
+            await self._box_dao.update(updated_box)
