@@ -34,7 +34,7 @@ from uos.inject import prepare_rest_app
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 from uos.ports.outbound.http import FileBoxClientPort
 
-pytestmark = pytest.mark.asyncio()
+pytestmark = pytest.mark.asyncio
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
 TEST_BOX_ID = UUID("bf344cd4-0c1b-434a-93d1-36a11b6b02d9")
 INVALID_HEADER: dict[str, str] = {"Authorization": "Bearer ab12"}

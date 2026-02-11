@@ -26,7 +26,7 @@ from tests.fixtures import ConfigFixture
 from uos.adapters.outbound.http import FileBoxClient
 from uos.core.models import FileUploadWithAccession
 
-pytestmark = pytest.mark.asyncio()
+pytestmark = pytest.mark.asyncio
 
 TEST_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 

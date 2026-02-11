@@ -26,7 +26,7 @@ from pytest_httpx import HTTPXMock
 from tests.fixtures import ConfigFixture
 from uos.adapters.outbound.http import AccessClient
 
-pytestmark = pytest.mark.asyncio()
+pytestmark = pytest.mark.asyncio
 
 TEST_USER_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")
 TEST_IVA_ID = UUID("8f9b2d54-bccc-42e9-8df4-7df5c5c610d2")

@@ -27,7 +27,7 @@ from pytest_httpx import HTTPXMock
 from tests.fixtures.joint import JointFixture
 from uos.core.models import AccessionMapRequest, UpdateUploadBoxRequest
 
-pytestmark = pytest.mark.asyncio()
+pytestmark = pytest.mark.asyncio
 
 
 @pytest.mark.httpx_mock(can_send_already_matched_responses=True)

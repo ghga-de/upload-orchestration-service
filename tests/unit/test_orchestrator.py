@@ -33,7 +33,7 @@ from uos.core import models
 from uos.core.orchestrator import UploadOrchestrator
 from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
 
-pytestmark = pytest.mark.asyncio()
+pytestmark = pytest.mark.asyncio
 
 TEST_FILE_UPLOAD_BOX_ID = UUID("2735c960-5e15-45dc-b27a-59162fbb2fd7")
 TEST_DS_ID = UUID("f698158d-8417-4368-bb45-349277bc45ee")

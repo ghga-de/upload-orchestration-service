@@ -35,7 +35,7 @@ from uos.adapters.outbound.audit import AuditRepository
 from uos.adapters.outbound.event_pub import EventPubTranslator
 from uos.core.models import ResearchDataUploadBox
 
-pytestmark = pytest.mark.asyncio()
+pytestmark = pytest.mark.asyncio
 
 
 AuditFixture = tuple[AuditRepository, InMemEventStore]

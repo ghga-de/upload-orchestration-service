@@ -26,7 +26,7 @@ from hexkit.providers.akafka.testutils import KafkaFixture
 from tests.fixtures.config import get_config
 from uos.inject import prepare_event_subscriber
 
-pytestmark = pytest.mark.asyncio()
+pytestmark = pytest.mark.asyncio
 UPSERTED = "upserted"
 
 TEST_FILE_UPLOAD_BOX_ID = UUID("f139ab68-56cc-4ca1-8866-2ffc8f297728")
