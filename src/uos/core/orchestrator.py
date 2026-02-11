@@ -597,21 +597,30 @@ class UploadOrchestrator(UploadOrchestratorPort):
     async def update_accession_map(
         self, *, box_id: UUID4, request: AccessionMapRequest
     ) -> None:
-        """Update the file accession map for a given box.
-
-        This method makes a call to the File Box API to get the latest list of
-        files in that upload box. Then, it verifies that each file ID in the mapping
-        exists in the retrieved list of files. Finally, it stores the mapping in the DB
-        and publishes an outbox event containing the mapping field content.
+        """Update the file accession map for a given box and publish an outbox event.
 
         **Files with a state of *cancelled* or *failed* are ignored.**
+
+        Check the specified ResearchDataUploadBox to verify it exists, that the version
+        stated in the request is current, and that the box has not already been archived.
+
+        Next, checked the mapping to verify that every file ID is specified exactly
+        once (and thus mapping is 1:1).
+
+        Then retrieve the latest list of files in the box from the File Box API to
+        verify that:
+        - each file ID in the mapping exists in the retrieved list of files
+        - all file IDs in the box are included in the mapping
+
+        Finally, store the mapping in the DB and publish an outbox event containing
+        the mapping field content.
 
         Raises:
             BoxNotFoundError: If the box doesn't exist
             VersionError: If the requested ResearchDataUploadBox version is outdated
             AccessionMapError: If the box is already archived, if the accession map
                 includes a file ID that doesn't exist in the box, if any files are
-                specified more than once.
+                specified more than once, or if any files in the box are left unmapped.
         """
         # Make sure the box exists
         try:
@@ -619,6 +628,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         except ResourceNotFoundError as err:
             raise self.BoxNotFoundError(box_id=box_id) from err
 
+        # Make sure requested box version is current
         if request.version != box.version:
             log.error(
                 "Accession Map update request specified version %i for RDUB %s, but"
@@ -641,7 +651,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Make sure all file IDs are only specified once
         unique_file_ids = set(request.mapping.values())
-        if dupe_count := (len(request.mapping.values()) - len(unique_file_ids)):
+        if dupe_count := (len(request.mapping) - len(unique_file_ids)):
             raise self.AccessionMapError(
                 f"Detected {dupe_count} file ID(s) specified more than once."
             )
@@ -655,11 +665,17 @@ class UploadOrchestrator(UploadOrchestratorPort):
         file_ids_in_box = set(
             f.id for f in files if f.state not in ("cancelled", "failed")
         )
-        invalid_ids = unique_file_ids - file_ids_in_box
-        if invalid_ids:
+        if invalid_ids := (unique_file_ids - file_ids_in_box):
             raise self.AccessionMapError(
                 "Invalid accession map. These file IDs are not in the box:"
-                + f" {', '.join(map(str, invalid_ids))}"
+                + f" {', '.join(map(str, invalid_ids))}."
+            )
+
+        # Make sure all active files in the box are included in the mapping
+        if unmapped_ids := (file_ids_in_box - unique_file_ids):
+            raise self.AccessionMapError(
+                "Invalid accession map. These file IDs still need to be mapped:"
+                f" {', '.join(map(str, unmapped_ids))}."
             )
 
         # Store the data and publish an outbox event

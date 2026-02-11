@@ -23,7 +23,7 @@ from uos.constants import ACCESSION_MAPS_COLLECTION, BOX_COLLECTION
 from uos.core.models import AccessionMap, ResearchDataUploadBox
 from uos.ports.outbound.dao import AccessionMapDao, BoxDao
 
-__all__ = ["OutboxPubConfig", "get_box_dao"]
+__all__ = ["OutboxPubConfig", "get_accession_map_dao", "get_box_dao"]
 
 
 class OutboxPubConfig(ResearchDataUploadBoxEventsConfig):

@@ -235,20 +235,29 @@ class UploadOrchestratorPort(ABC):
     async def update_accession_map(
         self, *, box_id: UUID4, request: AccessionMapRequest
     ) -> None:
-        """Update the file accession map for a given box.
-
-        This method makes a call to the File Box API to get the latest list of
-        files in that upload box. Then, it verifies that each file ID in the mapping
-        exists in the retrieved list of files. Finally, it stores the mapping in the DB
-        and publishes an outbox event containing the mapping field content.
+        """Update the file accession map for a given box and publish an outbox event.
 
         **Files with a state of *cancelled* or *failed* are ignored.**
+
+        Check the specified ResearchDataUploadBox to verify it exists, that the version
+        stated in the request is current, and that the box has not already been archived.
+
+        Next, checked the mapping to verify that every file ID is specified exactly
+        once (and thus mapping is 1:1).
+
+        Then retrieve the latest list of files in the box from the File Box API to
+        verify that:
+        - each file ID in the mapping exists in the retrieved list of files
+        - all file IDs in the box are included in the mapping
+
+        Finally, store the mapping in the DB and publish an outbox event containing
+        the mapping field content.
 
         Raises:
             BoxNotFoundError: If the box doesn't exist
             VersionError: If the requested ResearchDataUploadBox version is outdated
             AccessionMapError: If the box is already archived, if the accession map
                 includes a file ID that doesn't exist in the box, if any files are
-                specified more than once.
+                specified more than once, or if any files in the box are left unmapped.
         """
         ...

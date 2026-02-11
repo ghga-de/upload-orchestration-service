@@ -711,10 +711,12 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
 
 
-async def test_update_accession_map_invalid_file_ids(
+async def test_update_accession_map_invalid_or_unmapped_file_ids(
     rig: JointRig, populated_boxes: list[UUID]
 ):
-    """Test that invalid file IDs in a map raise AccessionMapError."""
+    """Test that invalid file IDs in an accession map or leaving any box files unmapped
+    triggers an AccessionMapError.
+    """
     box_id = populated_boxes[0]
 
     # Create test file uploads
@@ -752,6 +754,17 @@ async def test_update_accession_map_invalid_file_ids(
 
     # Verify file box client was called
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
+
+    # Create an accession map that omits a file
+    accession_map = models.AccessionMapRequest(
+        version=0, mapping={"GHGA001": test_file_ids[0]}
+    )
+
+    # Should raise AccessionMapError
+    with pytest.raises(rig.controller.AccessionMapError) as exc_info:
+        await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
+
+    assert "still need to be mapped" in str(exc_info.value)
 
 
 async def test_update_accession_map_filters_cancelled_and_failed(
