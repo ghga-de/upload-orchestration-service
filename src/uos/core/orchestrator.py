@@ -601,7 +601,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         This method makes a call to the File Box API to get the latest list of
         files in that upload box. Then, it verifies that each file ID in the mapping
-        exists in the retrieved list of files. Finally, it stores the mapping in the DB.
+        exists in the retrieved list of files. Finally, it stores the mapping in the DB
+        and publishes an outbox event containing the mapping field content.
 
         **Files with a state of *cancelled* or *failed* are ignored.**
 
@@ -661,7 +662,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 + f" {', '.join(map(str, invalid_ids))}"
             )
 
-        # Store the data
+        # Store the data and publish an outbox event
         accession_mapping = AccessionMap(box_id=box_id, mapping=request.mapping)
         await self._accession_map_dao.upsert(accession_mapping)
         log.info("Accession map upserted for RDUB %s", box_id)

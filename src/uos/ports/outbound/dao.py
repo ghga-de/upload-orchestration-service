@@ -16,10 +16,11 @@
 """DAO Port definition"""
 
 from hexkit.protocols.dao import Dao
+from hexkit.protocols.daopub import DaoPublisher
 
 from uos.core.models import AccessionMap, ResearchDataUploadBox
 
 __all__ = ["AccessionMapDao", "BoxDao"]
 
 BoxDao = Dao[ResearchDataUploadBox]
-AccessionMapDao = Dao[AccessionMap]
+AccessionMapDao = DaoPublisher[AccessionMap]

@@ -262,8 +262,21 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         version=3,
         mapping={"GHGA001": file_id_1, "GHGA002": file_id_2, "GHGA003": file_id_3},
     )
-    await joint_fixture.upload_orchestrator.update_accession_map(
-        box_id=box_id, request=accession_map
+    async with joint_fixture.kafka.record_events(
+        in_topic=joint_fixture.config.accession_map_topic
+    ) as accession_event_recorder:
+        await joint_fixture.upload_orchestrator.update_accession_map(
+            box_id=box_id, request=accession_map
+        )
+
+    # Verify the updated accession map was published
+    assert accession_event_recorder.recorded_events
+    assert len(accession_event_recorder.recorded_events) == 1
+    accession_map_event = accession_event_recorder.recorded_events[0]
+    assert accession_map_event.type_ == "upserted"
+    assert accession_map_event.key == str(box_id)
+    assert (
+        accession_map_event.payload == accession_map.model_dump(mode="json")["mapping"]
     )
 
     # Mock the archive endpoint

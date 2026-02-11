@@ -95,7 +95,9 @@ async def prepare_core(*, config: Config) -> AsyncGenerator[UploadOrchestratorPo
         box_dao = await get_box_dao(
             config=config, dao_publisher_factory=dao_publisher_factory
         )
-        accession_map_dao = await get_accession_map_dao(dao_factory=dao_factory)
+        accession_map_dao = await get_accession_map_dao(
+            config=config, dao_publisher_factory=dao_publisher_factory
+        )
         access_client = AccessClient(config=config, httpx_client=httpx_client)
         file_upload_box_client = FileBoxClient(config=config, httpx_client=httpx_client)
 

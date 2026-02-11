@@ -56,6 +56,17 @@ The service requires the following configuration parameters:
   "research-data-upload-boxes"
   ```
 
+- <a id="properties/accession_map_topic"></a>**`accession_map_topic`** *(string, required)*: The name of the topic used for file accession map outbox events.
+
+  Examples:
+  ```json
+  "accession-maps"
+  ```
+
+  ```json
+  "file-accession-maps"
+  ```
+
 - <a id="properties/file_upload_box_topic"></a>**`file_upload_box_topic`** *(string, required)*: Topic containing published FileUploadBox outbox events.
 
   Examples:
@@ -79,28 +90,6 @@ The service requires the following configuration parameters:
   Examples:
   ```json
   "audit_record_logged"
-  ```
-
-- <a id="properties/accession_map_topic"></a>**`accession_map_topic`** *(string, required)*: The name of the topic used for file accession map events.
-
-  Examples:
-  ```json
-  "accession-maps"
-  ```
-
-  ```json
-  "file-accession-maps"
-  ```
-
-- <a id="properties/accession_map_type"></a>**`accession_map_type`** *(string, required)*: The event type to use for file accession map events.
-
-  Examples:
-  ```json
-  "accession_map"
-  ```
-
-  ```json
-  "file_accession_map"
   ```
 
 - <a id="properties/ucs_url"></a>**`ucs_url`** *(string, format: uri, required)*: URL pointing to the API of the service that owns FileUploadBoxes (currently the UCS). Length must be between 1 and 2083 (inclusive).

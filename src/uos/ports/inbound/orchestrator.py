@@ -239,7 +239,8 @@ class UploadOrchestratorPort(ABC):
 
         This method makes a call to the File Box API to get the latest list of
         files in that upload box. Then, it verifies that each file ID in the mapping
-        exists in the retrieved list of files. Finally, it stores the mapping in the DB.
+        exists in the retrieved list of files. Finally, it stores the mapping in the DB
+        and publishes an outbox event containing the mapping field content.
 
         **Files with a state of *cancelled* or *failed* are ignored.**
 

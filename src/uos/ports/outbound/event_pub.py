@@ -18,8 +18,6 @@ from abc import ABC, abstractmethod
 
 from ghga_event_schemas.pydantic_ import AuditRecord
 
-from uos.core.models import AccessionMap
-
 __all__ = ["EventPublisherPort"]
 
 
@@ -29,7 +27,3 @@ class EventPublisherPort(ABC):
     @abstractmethod
     async def publish_audit_record(self, audit_record: AuditRecord) -> None:
         """Publish an audit record event"""
-
-    @abstractmethod
-    async def publish_accession_map(self, *, accession_map: AccessionMap):
-        """Publish a file accession map"""
