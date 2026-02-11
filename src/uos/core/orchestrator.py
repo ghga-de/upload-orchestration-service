@@ -20,11 +20,7 @@ from uuid import UUID
 
 from ghga_service_commons.auth.ghga import AuthContext
 from ghga_service_commons.utils.utc_dates import UTCDatetime
-from hexkit.protocols.dao import (
-    NoHitsFoundError,
-    ResourceNotFoundError,
-    UniqueConstraintViolationError,
-)
+from hexkit.protocols.dao import NoHitsFoundError, ResourceNotFoundError
 from hexkit.utils import now_utc_ms_prec
 from pydantic import UUID4
 
@@ -667,9 +663,5 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Store the data
         accession_mapping = AccessionMap(box_id=box_id, mapping=request.mapping)
-        try:
-            await self._accession_map_dao.upsert(accession_mapping)
-        except UniqueConstraintViolationError as err:
-            error = self.AccessionMapError("Accessions must be globally unique.")
-            log.error(error, extra={"box_id": box_id})
-            raise error from err
+        await self._accession_map_dao.upsert(accession_mapping)
+        log.info("Accession map upserted for RDUB %s", box_id)
