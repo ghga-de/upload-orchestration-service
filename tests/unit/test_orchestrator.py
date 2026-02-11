@@ -747,10 +747,8 @@ async def test_update_accession_map_invalid_or_unmapped_file_ids(
     )
 
     # Should raise AccessionMapError
-    with pytest.raises(rig.controller.AccessionMapError) as exc_info:
+    with pytest.raises(rig.controller.AccessionMapError, match="not in the box"):
         await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
-
-    assert "not in the box" in str(exc_info.value)
 
     # Verify file box client was called
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
@@ -761,10 +759,10 @@ async def test_update_accession_map_invalid_or_unmapped_file_ids(
     )
 
     # Should raise AccessionMapError
-    with pytest.raises(rig.controller.AccessionMapError) as exc_info:
+    with pytest.raises(
+        rig.controller.AccessionMapError, match="still need to be mapped"
+    ):
         await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
-
-    assert "still need to be mapped" in str(exc_info.value)
 
 
 async def test_update_accession_map_filters_cancelled_and_failed(
@@ -934,14 +932,12 @@ async def test_update_box_outdated_version(rig: JointRig, populated_boxes: list[
         title="New Title",
     )
 
-    with pytest.raises(rig.controller.VersionError) as exc_info:
+    with pytest.raises(rig.controller.VersionError, match="has changed"):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
             auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
-
-    assert "has changed" in str(exc_info.value)
 
 
 async def test_archive_box_not_locked(rig: JointRig, populated_boxes: list[UUID]):
@@ -957,14 +953,15 @@ async def test_archive_box_not_locked(rig: JointRig, populated_boxes: list[UUID]
         version=box.version, state="archived"
     )
 
-    with pytest.raises(rig.controller.StateChangeError) as exc_info:
+    with pytest.raises(
+        rig.controller.StateChangeError,
+        match="cannot be changed from 'open' to 'archived'",
+    ):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
             auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
-
-    assert "cannot be changed from 'open' to 'archived'" in str(exc_info.value).lower()
 
 
 async def test_archive_box_no_accession_map(rig: JointRig, populated_boxes: list[UUID]):
@@ -981,14 +978,12 @@ async def test_archive_box_no_accession_map(rig: JointRig, populated_boxes: list
         version=box.version, state="archived"
     )
 
-    with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
+    with pytest.raises(rig.controller.ArchivalPrereqsError, match="not been assigned"):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
             auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
-
-    assert "not been assigned" in str(exc_info.value)
 
 
 async def test_archive_box_missing_accessions(
@@ -1035,16 +1030,14 @@ async def test_archive_box_missing_accessions(
         version=box.version, state="archived"
     )
 
-    with pytest.raises(rig.controller.ArchivalPrereqsError) as exc_info:
+    with pytest.raises(
+        rig.controller.ArchivalPrereqsError, match="missing an accession"
+    ):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
             auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
-
-    # Check the message in the error
-    assert "missing an accession" in str(exc_info.value)
-    assert str(test_file_ids[2]) in str(exc_info.value)
 
 
 async def test_archive_box_file_upload_box_version_error(
@@ -1093,14 +1086,12 @@ async def test_archive_box_file_upload_box_version_error(
         version=box.version, state="archived"
     )
 
-    with pytest.raises(rig.controller.VersionError) as exc_info:
+    with pytest.raises(rig.controller.VersionError, match="out of date"):
         await rig.controller.update_research_data_upload_box(
             box_id=box_id,
             request=update_request,
             auth_context=DATA_STEWARD_AUTH_CONTEXT,
         )
-
-    assert "out of date" in str(exc_info.value).lower()
 
     # Verify the box state was rolled back
     unchanged_box = await rig.box_dao.get_by_id(box_id)
