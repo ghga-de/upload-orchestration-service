@@ -642,8 +642,9 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # Don't allow changes to archived boxes
         if box.state == "archived":
             log.error(
-                "Cannot update accessions for RDUB %s because it is already archived",
+                "Cannot update accessions for RDUB %s because it is already archived.",
                 box_id,
+                extra={"box_id": box_id},
             )
             raise self.AccessionMapError(
                 "Data already archived - accessions cannot be modified."
@@ -652,6 +653,15 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # Make sure all file IDs are only specified once
         unique_file_ids = set(request.mapping.values())
         if dupe_count := (len(request.mapping) - len(unique_file_ids)):
+            log.error(
+                "Duplicate file IDs in accession map for box %s.",
+                box_id,
+                extra={
+                    "rdub_id": box_id,
+                    "fub_id": box.file_upload_box_id,
+                    "duplicate_count": dupe_count,
+                },
+            )
             raise self.AccessionMapError(
                 f"Detected {dupe_count} file ID(s) specified more than once."
             )
@@ -666,6 +676,15 @@ class UploadOrchestrator(UploadOrchestratorPort):
             f.id for f in files if f.state not in ("cancelled", "failed")
         )
         if invalid_ids := (unique_file_ids - file_ids_in_box):
+            log.error(
+                "Accession map for box %s included unknown file IDs.",
+                box_id,
+                extra={
+                    "rdub_id": box_id,
+                    "fub_id": box.file_upload_box_id,
+                    "unknown_file_ids": invalid_ids,
+                },
+            )
             raise self.AccessionMapError(
                 "Invalid accession map. These file IDs are not in the box:"
                 + f" {', '.join(map(str, invalid_ids))}."
@@ -673,6 +692,15 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Make sure all active files in the box are included in the mapping
         if unmapped_ids := (file_ids_in_box - unique_file_ids):
+            log.error(
+                "Accession map for box %s included unmapped file IDs.",
+                box_id,
+                extra={
+                    "rdub_id": box_id,
+                    "fub_id": box.file_upload_box_id,
+                    "unmapped_file_ids": unmapped_ids,
+                },
+            )
             raise self.AccessionMapError(
                 "Invalid accession map. These file IDs still need to be mapped:"
                 f" {', '.join(map(str, unmapped_ids))}."
