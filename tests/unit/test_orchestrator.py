@@ -31,7 +31,11 @@ from tests.fixtures import ConfigFixture
 from uos.config import Config
 from uos.core import models
 from uos.core.orchestrator import UploadOrchestrator
-from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
+from uos.ports.outbound.http import (
+    AccessClientPort,
+    AccessionClientPort,
+    FileBoxClientPort,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -63,6 +67,7 @@ class JointRig:
     accession_map_dao: BaseInMemDao[models.AccessionMap]
     file_upload_box_client: FileBoxClientPort
     access_client: AccessClientPort
+    accession_client: AccessionClientPort
     controller: UploadOrchestrator
 
 
@@ -78,12 +83,14 @@ def rig(config: ConfigFixture) -> JointRig:
     file_box_client_mock = AsyncMock()
     file_box_client_mock.create_file_upload_box = file_upload_box_id_generator
     access_client_mock = AsyncMock()
+    accession_client_mock = AsyncMock()
 
     controller = UploadOrchestrator(
         box_dao=(box_dao := InMemBoxDao()),  # type: ignore
         accession_map_dao=(accession_map_dao := InMemAccessionMapDao()),  # type: ignore
         file_upload_box_client=file_box_client_mock,
         access_client=access_client_mock,
+        accession_client=accession_client_mock,
         audit_repository=AsyncMock(),
     )
 
@@ -93,6 +100,7 @@ def rig(config: ConfigFixture) -> JointRig:
         accession_map_dao=accession_map_dao,
         file_upload_box_client=file_box_client_mock,
         access_client=access_client_mock,
+        accession_client=accession_client_mock,
         controller=controller,
     )
 
@@ -696,6 +704,9 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
     with pytest.raises(rig.controller.BoxNotFoundError):
         await rig.controller.update_accession_map(box_id=uuid4(), request=accession_map)
 
+    # Verify that the accession client was not called
+    rig.accession_client.submit_accession_map.assert_not_called()  # type: ignore
+
     # Verify file box client was not called
     rig.file_upload_box_client.get_file_upload_list.assert_not_called()  # type: ignore
 
@@ -714,6 +725,9 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
     # Verify the research data upload box version was incremented
     box = await rig.box_dao.get_by_id(box_id)
     assert box.version - version_pre_update == 1
+
+    # Verify that the accession client was called
+    rig.accession_client.submit_accession_map.assert_called_once()  # type: ignore
 
     # Verify file box client was called
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
