@@ -35,6 +35,16 @@
       "title": "Audit Record Type",
       "type": "string"
     },
+    "jwt_signing_key": {
+      "description": "The private key for signing work order tokens and other JWTs",
+      "examples": [
+        "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
+      ],
+      "format": "password",
+      "title": "Jwt Signing Key",
+      "type": "string",
+      "writeOnly": true
+    },
     "accession_url": {
       "description": "URL pointing to the API of the service that manages accession numbers.",
       "examples": [
@@ -56,16 +66,6 @@
       "minLength": 1,
       "title": "Ucs Url",
       "type": "string"
-    },
-    "work_order_signing_key": {
-      "description": "The private key for signing work order tokens",
-      "examples": [
-        "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
-      ],
-      "format": "password",
-      "title": "Work Order Signing Key",
-      "type": "string",
-      "writeOnly": true
     },
     "access_url": {
       "description": "URL pointing to the internal access API.",
@@ -522,9 +522,9 @@
     "file_upload_box_topic",
     "audit_record_topic",
     "audit_record_type",
+    "jwt_signing_key",
     "accession_url",
     "ucs_url",
-    "work_order_signing_key",
     "access_url",
     "service_instance_id",
     "kafka_servers",

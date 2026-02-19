@@ -20,12 +20,20 @@ from typing import Any
 from uuid import UUID
 
 import httpx
+from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from jwcrypto import jwk
+from jwcrypto.jwk import JWK
 from pydantic import UUID4, Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings
 
-from uos.constants import HTTPX_TIMEOUT
+from uos.constants import (
+    AUTH_TOKEN_VALID_SECONDS,
+    HTTPX_TIMEOUT,
+    JWT_AUD,
+    JWT_ISS,
+    JWT_SUB,
+)
 from uos.core.models import (
     AccessionMap,
     BaseWorkOrderToken,
@@ -43,6 +51,16 @@ from uos.ports.outbound.http import (
 )
 
 log = logging.getLogger(__name__)
+
+
+class JWTSigningConfig(BaseSettings):
+    """Base config for JWT use"""
+
+    jwt_signing_key: SecretStr = Field(
+        ...,
+        description="The private key for signing work order tokens and other JWTs",
+        examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
+    )
 
 
 class AccessApiConfig(BaseSettings):
@@ -241,7 +259,7 @@ class AccessClient(AccessClientPort):
             raise self.AccessAPIError("Failed to check box access.") from err
 
 
-class FileBoxClientConfig(BaseSettings):
+class FileBoxClientConfig(JWTSigningConfig):
     """Config parameters for interacting with the service owning FileUploadBoxes."""
 
     ucs_url: HttpUrl = Field(
@@ -249,11 +267,6 @@ class FileBoxClientConfig(BaseSettings):
         description="URL pointing to the API of the service that owns FileUploadBoxes"
         + " (currently the UCS).",
         examples=["http://127.0.0.1/upload"],
-    )
-    work_order_signing_key: SecretStr = Field(
-        ...,
-        description="The private key for signing work order tokens",
-        examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
     )
 
 
@@ -266,9 +279,7 @@ class FileBoxClient(FileBoxClientPort):
     def __init__(self, *, config: FileBoxClientConfig, httpx_client: httpx.AsyncClient):
         self._ucs_url = config.ucs_url
         self._client = httpx_client
-        self._signing_key = jwk.JWK.from_json(
-            config.work_order_signing_key.get_secret_value()
-        )
+        self._signing_key = jwk.JWK.from_json(config.jwt_signing_key.get_secret_value())
         if not self._signing_key.has_private:
             key_error = KeyError("No private work order signing key found.")
             log.error(key_error)
@@ -444,7 +455,7 @@ class FileBoxClient(FileBoxClientPort):
             raise self.OperationError("Failed to archive FileUploadBox.")
 
 
-class AccessionClientConfig(BaseSettings):
+class AccessionClientConfig(JWTSigningConfig):
     """Config parameters for interacting with the service that manages accession numbers."""
 
     accession_url: HttpUrl = Field(
@@ -460,8 +471,23 @@ class AccessionClient(AccessionClientPort):
     def __init__(
         self, *, config: AccessionClientConfig, httpx_client: httpx.AsyncClient
     ):
-        self._accession_url = config.accession_url
         self._client = httpx_client
+        self._accession_url = config.accession_url
+        self._signing_key = JWK.from_json(config.jwt_signing_key.get_secret_value())
+        if not self._signing_key.has_private:
+            value_error = ValueError("No private token-signing key found.")
+            log.error(value_error)
+            raise value_error
+
+    def _make_jwt(self) -> str:
+        claims: dict[str, str] = {"iss": JWT_ISS, "aud": JWT_AUD, "sub": JWT_SUB}
+        return sign_and_serialize_token(
+            claims=claims, key=self._signing_key, valid_seconds=AUTH_TOKEN_VALID_SECONDS
+        )
+
+    def _auth_headers(self) -> dict[str, str]:
+        """Create an authorization header with a bearer token containing a fresh JWT"""
+        return {"Authorization": f"Bearer {self._make_jwt()}"}
 
     async def submit_accession_map(self, *, accession_map: AccessionMap) -> None:
         """Submit a map of accession numbers to file IDs.
@@ -471,7 +497,8 @@ class AccessionClient(AccessionClientPort):
         """
         json_mapping = accession_map.model_dump(mode="json")["mapping"]
         response = await self._client.post(
-            f"{self._accession_url}/accession-map",
+            f"{self._accession_url}/accession-maps",
+            headers=self._auth_headers(),
             json=json_mapping,
             timeout=HTTPX_TIMEOUT,
         )

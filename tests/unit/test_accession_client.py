@@ -14,14 +14,21 @@
 # limitations under the License.
 """Unit tests for the AccessionClient"""
 
+from datetime import timedelta
+from typing import Literal, cast
 from uuid import UUID, uuid4
 
 import httpx
 import pytest
+from ghga_service_commons.auth.jwt_auth import JWTAuthConfig, JWTAuthContextProvider
+from ghga_service_commons.utils.utc_dates import UTCDatetime
+from hexkit.utils import now_utc_ms_prec
+from pydantic import BaseModel
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures import ConfigFixture
 from uos.adapters.outbound.http import AccessionClient
+from uos.constants import JWT_ISS, JWT_SUB
 from uos.core.models import AccessionMap
 
 pytestmark = pytest.mark.asyncio
@@ -32,6 +39,16 @@ ACCESSION_MAP = AccessionMap(
     box_id=TEST_BOX_ID,
     mapping={"GHGA:file1": uuid4(), "GHGA:file2": uuid4()},
 )
+
+
+class JWTClaimsModel(BaseModel):
+    """Model which defines the expected JWT format"""
+
+    aud: Literal["GHGA"]
+    iss: Literal["GHGA"]
+    sub: str
+    iat: UTCDatetime
+    exp: UTCDatetime
 
 
 async def test_submission(
@@ -62,3 +79,34 @@ async def test_submission(
     httpx_mock.add_response(404, json={"error": "Not found"})
     with pytest.raises(AccessionClient.OperationError):
         await accession_client.submit_accession_map(accession_map=ACCESSION_MAP)
+
+
+async def test_jwt_formation(
+    config: ConfigFixture, httpx_mock: HTTPXMock, httpx_client: httpx.AsyncClient
+):
+    """Test that the AccessionClient class formulates proper JWTs"""
+    # Create a mock JWTAuthContextProvider so we can inspect the JWT sent by this service
+    accession_api_auth_config = JWTAuthConfig(
+        auth_key=config.signing_jwk.export_public(),
+        auth_check_claims=dict.fromkeys(["iss", "iat", "sub", "aud", "exp"]),
+    )
+    auth_context_provider = JWTAuthContextProvider(
+        config=accession_api_auth_config, context_class=JWTClaimsModel
+    )
+
+    # Define a callback that can inspect the request from the accession client
+    async def callback(request: httpx.Request):
+        """Callback function that decrypts the JWT in the bearer token"""
+        token = cast(str, request.headers.get("Authorization"))
+        token = token.removeprefix("Bearer ")
+        context = await auth_context_provider.get_context(token)
+        assert context
+        assert context.iss == context.aud == JWT_ISS
+        assert context.sub == JWT_SUB
+        assert context.iat - now_utc_ms_prec() < timedelta(seconds=3)
+        return httpx.Response(204)
+
+    # Register the callback
+    httpx_mock.add_callback(callback=callback)
+    accession_client = AccessionClient(config=config.config, httpx_client=httpx_client)
+    await accession_client.submit_accession_map(accession_map=ACCESSION_MAP)

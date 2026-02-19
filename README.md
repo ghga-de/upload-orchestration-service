@@ -88,6 +88,13 @@ The service requires the following configuration parameters:
   "http://127.0.0.1/accessions"
   ```
 
+- <a id="properties/jwt_signing_key"></a>**`jwt_signing_key`** *(string, format: password, required and write-only)*: The UOS's private JWK for signing JWT auth tokens.
+
+  Examples:
+  ```json
+  "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\", \"d\": \"...\"}"
+  ```
+
 - <a id="properties/ucs_url"></a>**`ucs_url`** *(string, format: uri, required)*: URL pointing to the API of the service that owns FileUploadBoxes (currently the UCS). Length must be between 1 and 2083 (inclusive).
 
   Examples:
@@ -95,7 +102,7 @@ The service requires the following configuration parameters:
   "http://127.0.0.1/upload"
   ```
 
-- <a id="properties/work_order_signing_key"></a>**`work_order_signing_key`** *(string, format: password, required and write-only)*: The private key for signing work order tokens.
+- <a id="properties/jwt_signing_key"></a>**`jwt_signing_key`** *(string, format: password, required and write-only)*: The private key for signing work order tokens.
 
   Examples:
   ```json
