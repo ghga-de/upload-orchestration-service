@@ -22,9 +22,15 @@ Additional endpoints might be structured in dedicated modules
 
 from ghga_service_commons.api import run_server
 from hexkit.log import configure_logging
+from hexkit.providers.mongokafka import MongoKafkaDaoPublisherFactory
 
+from uos.adapters.outbound.dao import get_box_dao
 from uos.config import Config
-from uos.inject import prepare_event_subscriber, prepare_rest_app
+from uos.inject import (
+    get_persistent_publisher,
+    prepare_event_subscriber,
+    prepare_rest_app,
+)
 
 
 async def run_rest_app():
@@ -43,3 +49,26 @@ async def consume_events(run_forever: bool = True):
 
     async with prepare_event_subscriber(config=config) as event_subscriber:
         await event_subscriber.run(forever=run_forever)
+
+
+async def publish_events(*, all: bool = False):
+    """Publish pending events. Set `--all` to (re)publish all events regardless of status."""
+    config = Config()  # type: ignore[call-arg]
+    configure_logging(config=config)
+
+    async with get_persistent_publisher(config=config) as persistent_publisher:
+        if all:
+            await persistent_publisher.republish()
+        else:
+            await persistent_publisher.publish_pending()
+
+    async with (
+        MongoKafkaDaoPublisherFactory.construct(config=config) as dao_publisher_factory,
+    ):
+        dao = await get_box_dao(
+            config=config, dao_publisher_factory=dao_publisher_factory
+        )
+        if all:
+            await dao.republish()
+        else:
+            await dao.publish_pending()

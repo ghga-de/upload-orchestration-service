@@ -45,6 +45,7 @@ from uos.core.orchestrator import UploadOrchestrator
 from uos.ports.inbound.orchestrator import UploadOrchestratorPort
 
 __all__ = [
+    "get_persistent_publisher",
     "prepare_core",
     "prepare_event_subscriber",
     "prepare_rest_app",
