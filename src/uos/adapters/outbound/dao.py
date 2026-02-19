@@ -15,6 +15,7 @@
 """DAO implementation"""
 
 from ghga_event_schemas.configs import ResearchDataUploadBoxEventsConfig
+from hexkit.protocols.dao import DaoFactoryProtocol
 from hexkit.protocols.daopub import DaoPublisherFactoryProtocol
 from hexkit.providers.mongodb import MongoDbIndex
 from pydantic import Field
@@ -54,15 +55,10 @@ async def get_box_dao(
     )
 
 
-async def get_accession_map_dao(
-    *, config: OutboxPubConfig, dao_publisher_factory: DaoPublisherFactoryProtocol
-) -> AccessionMapDao:
-    """Construct an AccessionMap outbox DAO from the provided dao_publisher_factory."""
-    return await dao_publisher_factory.get_dao(
+async def get_accession_map_dao(*, dao_factory: DaoFactoryProtocol) -> AccessionMapDao:
+    """Construct an AccessionMap DAO from the provided dao_factory."""
+    return await dao_factory.get_dao(
         name=ACCESSION_MAPS_COLLECTION,
         dto_model=AccessionMap,
         id_field="box_id",
-        dto_to_event=lambda dto: dto.mapping,
-        event_topic=config.accession_map_topic,
-        autopublish=True,
     )

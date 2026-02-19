@@ -27,6 +27,7 @@ from pydantic_settings import BaseSettings
 
 from uos.constants import HTTPX_TIMEOUT
 from uos.core.models import (
+    AccessionMap,
     BaseWorkOrderToken,
     ChangeFileBoxWorkOrder,
     CreateFileBoxWorkOrder,
@@ -35,7 +36,11 @@ from uos.core.models import (
     ViewFileBoxWorkOrder,
 )
 from uos.core.tokens import sign_work_order_token
-from uos.ports.outbound.http import AccessClientPort, FileBoxClientPort
+from uos.ports.outbound.http import (
+    AccessClientPort,
+    AccessionClientPort,
+    FileBoxClientPort,
+)
 
 log = logging.getLogger(__name__)
 
@@ -47,22 +52,6 @@ class AccessApiConfig(BaseSettings):
         ...,
         description="URL pointing to the internal access API.",
         examples=["http://127.0.0.1/access"],
-    )
-
-
-class FileBoxClientConfig(BaseSettings):
-    """Config parameters for interacting with the service owning FileUploadBoxes."""
-
-    ucs_url: HttpUrl = Field(
-        ...,
-        description="URL pointing to the API of the service that owns FileUploadBoxes"
-        + " (currently the UCS).",
-        examples=["http://127.0.0.1/upload"],
-    )
-    work_order_signing_key: SecretStr = Field(
-        ...,
-        description="The private key for signing work order tokens",
-        examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
     )
 
 
@@ -252,6 +241,22 @@ class AccessClient(AccessClientPort):
             raise self.AccessAPIError("Failed to check box access.") from err
 
 
+class FileBoxClientConfig(BaseSettings):
+    """Config parameters for interacting with the service owning FileUploadBoxes."""
+
+    ucs_url: HttpUrl = Field(
+        ...,
+        description="URL pointing to the API of the service that owns FileUploadBoxes"
+        + " (currently the UCS).",
+        examples=["http://127.0.0.1/upload"],
+    )
+    work_order_signing_key: SecretStr = Field(
+        ...,
+        description="The private key for signing work order tokens",
+        examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
+    )
+
+
 class FileBoxClient(FileBoxClientPort):
     """An adapter for interacting with the service that owns FileUploadBoxes.
 
@@ -437,3 +442,46 @@ class FileBoxClient(FileBoxClientPort):
                 },
             )
             raise self.OperationError("Failed to archive FileUploadBox.")
+
+
+class AccessionClientConfig(BaseSettings):
+    """Config parameters for interacting with the service that manages accession numbers."""
+
+    accession_url: HttpUrl = Field(
+        ...,
+        description="URL pointing to the API of the service that manages accession numbers.",
+        examples=["http://127.0.0.1/accessions"],
+    )
+
+
+class AccessionClient(AccessionClientPort):
+    """An adapter for interacting with the service that manages accession numbers."""
+
+    def __init__(
+        self, *, config: AccessionClientConfig, httpx_client: httpx.AsyncClient
+    ):
+        self._accession_url = config.accession_url
+        self._client = httpx_client
+
+    async def submit_accession_map(self, *, accession_map: AccessionMap) -> None:
+        """Submit a map of accession numbers to file IDs.
+
+        Raises:
+            OperationError: if there's a problem during the operation.
+        """
+        json_mapping = accession_map.model_dump(mode="json")["mapping"]
+        response = await self._client.post(
+            f"{self._accession_url}/accession-map",
+            json=json_mapping,
+            timeout=HTTPX_TIMEOUT,
+        )
+        if response.status_code != 204:
+            log.error(
+                "Failed to submit accession map for ResearchDataUploadBox ID %s.",
+                accession_map.box_id,
+                extra={
+                    "status_code": response.status_code,
+                    "response_text": response.text,
+                },
+            )
+            raise self.OperationError("Failed to submit accession map.")

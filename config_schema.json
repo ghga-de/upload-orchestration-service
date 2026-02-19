@@ -44,6 +44,17 @@
       "title": "Audit Record Type",
       "type": "string"
     },
+    "accession_url": {
+      "description": "URL pointing to the API of the service that manages accession numbers.",
+      "examples": [
+        "http://127.0.0.1/accessions"
+      ],
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Accession Url",
+      "type": "string"
+    },
     "ucs_url": {
       "description": "URL pointing to the API of the service that owns FileUploadBoxes (currently the UCS).",
       "examples": [
@@ -521,6 +532,7 @@
     "file_upload_box_topic",
     "audit_record_topic",
     "audit_record_type",
+    "accession_url",
     "ucs_url",
     "work_order_signing_key",
     "access_url",

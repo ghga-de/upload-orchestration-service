@@ -38,7 +38,7 @@ from uos.adapters.inbound.fastapi_.configure import get_configured_app
 from uos.adapters.outbound.audit import AuditRepository
 from uos.adapters.outbound.dao import get_accession_map_dao, get_box_dao
 from uos.adapters.outbound.event_pub import EventPubTranslator
-from uos.adapters.outbound.http import AccessClient, FileBoxClient
+from uos.adapters.outbound.http import AccessClient, AccessionClient, FileBoxClient
 from uos.config import Config
 from uos.constants import SERVICE_NAME
 from uos.core.orchestrator import UploadOrchestrator
@@ -95,11 +95,10 @@ async def prepare_core(*, config: Config) -> AsyncGenerator[UploadOrchestratorPo
         box_dao = await get_box_dao(
             config=config, dao_publisher_factory=dao_publisher_factory
         )
-        accession_map_dao = await get_accession_map_dao(
-            config=config, dao_publisher_factory=dao_publisher_factory
-        )
+        accession_map_dao = await get_accession_map_dao(dao_factory=dao_factory)
         access_client = AccessClient(config=config, httpx_client=httpx_client)
         file_upload_box_client = FileBoxClient(config=config, httpx_client=httpx_client)
+        accession_client = AccessionClient(config=config, httpx_client=httpx_client)
 
         yield UploadOrchestrator(
             box_dao=box_dao,
@@ -107,6 +106,7 @@ async def prepare_core(*, config: Config) -> AsyncGenerator[UploadOrchestratorPo
             audit_repository=audit_repository,
             access_client=access_client,
             file_upload_box_client=file_upload_box_client,
+            accession_client=accession_client,
         )
 
 

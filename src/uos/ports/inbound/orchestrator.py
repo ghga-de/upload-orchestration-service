@@ -251,12 +251,13 @@ class UploadOrchestratorPort(ABC):
         - each file ID in the mapping exists in the retrieved list of files
         - all file IDs in the box are included in the mapping
 
-        Finally, store the mapping in the DB and publish an outbox event containing
-        the mapping field content.
+        Finally, submit the accession map to the Accession API and store it in the DB.
 
         Raises:
             BoxNotFoundError: If the box doesn't exist
             VersionError: If the requested ResearchDataUploadBox version is outdated
+            OperationError: If there's a problem submitting the accession map to the
+                Accession API
             AccessionMapError: If
             - the box is already archived, or
             - the accession map includes a file ID that doesn't exist in the box, or

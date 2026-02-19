@@ -92,6 +92,13 @@ The service requires the following configuration parameters:
   "audit_record_logged"
   ```
 
+- <a id="properties/accession_url"></a>**`accession_url`** *(string, format: uri, required)*: URL pointing to the API of the service that manages accession numbers. Length must be between 1 and 2083 (inclusive).
+
+  Examples:
+  ```json
+  "http://127.0.0.1/accessions"
+  ```
+
 - <a id="properties/ucs_url"></a>**`ucs_url`** *(string, format: uri, required)*: URL pointing to the API of the service that owns FileUploadBoxes (currently the UCS). Length must be between 1 and 2083 (inclusive).
 
   Examples:
