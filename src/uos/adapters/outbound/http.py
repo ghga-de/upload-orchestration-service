@@ -507,6 +507,7 @@ class AccessionClient(AccessionClientPort):
                 "Failed to submit accession map for ResearchDataUploadBox ID %s.",
                 accession_map.box_id,
                 extra={
+                    "research_data_upload_box_id": accession_map.box_id,
                     "status_code": response.status_code,
                     "response_text": response.text,
                 },
