@@ -512,3 +512,5 @@ class AccessionClient(AccessionClientPort):
                 },
             )
             raise self.OperationError("Failed to submit accession map.")
+        else:
+            log.info("Submitted accession map for box %s.", accession_map.box_id)

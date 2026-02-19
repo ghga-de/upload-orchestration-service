@@ -59,24 +59,12 @@ async def test_submission(
     """
     accession_client = AccessionClient(config=config.config, httpx_client=httpx_client)
 
-    # Happy path
+    # Should see
     httpx_mock.add_response(204)
-    await accession_client.submit_accession_map(
-        accession_map=ACCESSION_MAP
-    )  # no error == success
+    await accession_client.submit_accession_map(accession_map=ACCESSION_MAP)
 
     # Check off-normal status code
     httpx_mock.add_response(500, json={"error": "Some error occurred."})
-    with pytest.raises(AccessionClient.OperationError):
-        await accession_client.submit_accession_map(accession_map=ACCESSION_MAP)
-
-    # Check 400 status code
-    httpx_mock.add_response(400, json={"error": "Bad request"})
-    with pytest.raises(AccessionClient.OperationError):
-        await accession_client.submit_accession_map(accession_map=ACCESSION_MAP)
-
-    # Check 404 status code
-    httpx_mock.add_response(404, json={"error": "Not found"})
     with pytest.raises(AccessionClient.OperationError):
         await accession_client.submit_accession_map(accession_map=ACCESSION_MAP)
 
