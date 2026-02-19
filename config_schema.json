@@ -10,15 +10,6 @@
       "title": "Research Data Upload Box Topic",
       "type": "string"
     },
-    "accession_map_topic": {
-      "description": "The name of the topic used for file accession map outbox events",
-      "examples": [
-        "accession-maps",
-        "file-accession-maps"
-      ],
-      "title": "Accession Map Topic",
-      "type": "string"
-    },
     "file_upload_box_topic": {
       "description": "Topic containing published FileUploadBox outbox events",
       "examples": [
@@ -528,7 +519,6 @@
   },
   "required": [
     "research_data_upload_box_topic",
-    "accession_map_topic",
     "file_upload_box_topic",
     "audit_record_topic",
     "audit_record_type",

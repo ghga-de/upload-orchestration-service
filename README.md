@@ -56,17 +56,6 @@ The service requires the following configuration parameters:
   "research-data-upload-boxes"
   ```
 
-- <a id="properties/accession_map_topic"></a>**`accession_map_topic`** *(string, required)*: The name of the topic used for file accession map outbox events.
-
-  Examples:
-  ```json
-  "accession-maps"
-  ```
-
-  ```json
-  "file-accession-maps"
-  ```
-
 - <a id="properties/file_upload_box_topic"></a>**`file_upload_box_topic`** *(string, required)*: Topic containing published FileUploadBox outbox events.
 
   Examples:
