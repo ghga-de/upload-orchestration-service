@@ -20,26 +20,19 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from ghga_service_commons.utils.jwt_helpers import sign_and_serialize_token
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from jwcrypto import jwk
-from jwcrypto.jwk import JWK
 from pydantic import UUID4, Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings
 
-from uos.constants import (
-    AUTH_TOKEN_VALID_SECONDS,
-    HTTPX_TIMEOUT,
-    JWT_AUD,
-    JWT_ISS,
-    JWT_SUB,
-)
+from uos.constants import HTTPX_TIMEOUT
 from uos.core.models import (
     AccessionMap,
     BaseWorkOrderToken,
     ChangeFileBoxWorkOrder,
     CreateFileBoxWorkOrder,
     FileUploadWithAccession,
+    SubmitAccessionMapWorkOrder,
     UploadGrant,
     ViewFileBoxWorkOrder,
 )
@@ -289,8 +282,7 @@ class FileBoxClient(FileBoxClientPort):
 
     def _auth_header(self, wot: BaseWorkOrderToken) -> dict[str, str]:
         signed_wot = sign_work_order_token(wot, self._signing_key)
-        headers = {"Authorization": f"Bearer {signed_wot}"}
-        return headers
+        return {"Authorization": f"Bearer {signed_wot}"}
 
     async def create_file_upload_box(
         self, *, storage_alias: str, user_id: UUID4
@@ -484,7 +476,7 @@ class AccessionClient(AccessionClientPort):
     ):
         self._client = httpx_client
         self._accession_url = config.accession_url
-        self._signing_key = JWK.from_json(
+        self._signing_key = jwk.JWK.from_json(
             config.work_order_signing_key.get_secret_value()
         )
         if not self._signing_key.has_private:
@@ -492,27 +484,27 @@ class AccessionClient(AccessionClientPort):
             log.error(value_error)
             raise value_error
 
-    def _make_jwt(self) -> str:
-        claims: dict[str, str] = {"iss": JWT_ISS, "aud": JWT_AUD, "sub": JWT_SUB}
-        return sign_and_serialize_token(
-            claims=claims, key=self._signing_key, valid_seconds=AUTH_TOKEN_VALID_SECONDS
-        )
+    def _auth_header(self, wot: BaseWorkOrderToken) -> dict[str, str]:
+        signed_wot = sign_work_order_token(wot, self._signing_key)
+        return {"Authorization": f"Bearer {signed_wot}"}
 
-    def _auth_headers(self) -> dict[str, str]:
-        """Create an authorization header with a bearer token containing a fresh JWT"""
-        return {"Authorization": f"Bearer {self._make_jwt()}"}
-
-    async def submit_accession_map(self, *, accession_map: AccessionMap) -> None:
+    async def submit_accession_map(
+        self, *, accession_map: AccessionMap, study_pid: str, user_id: UUID4
+    ) -> None:
         """Submit a map of accession numbers to file IDs.
+
+        The study_pid is a passthrough value required by SRS but not interpreted by UOS.
 
         Raises:
             OperationError: if there's a problem during the operation.
         """
+        wot = SubmitAccessionMapWorkOrder(user_id=user_id)
         json_mapping = accession_map.model_dump(mode="json")["mapping"]
+        body = {"study_pid": study_pid, "mapping": json_mapping}
         response = await self._client.post(
             f"{self._accession_url}/file-ids",
-            headers=self._auth_headers(),
-            json=json_mapping,
+            headers=self._auth_header(wot),
+            json=body,
             timeout=HTTPX_TIMEOUT,
         )
         if response.status_code != 204:

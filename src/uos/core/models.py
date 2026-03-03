@@ -101,6 +101,12 @@ class ViewFileBoxWorkOrder(BaseWorkOrderToken):
     box_id: UUID4 = Field(..., description="ID of the box to view")
 
 
+class SubmitAccessionMapWorkOrder(BaseWorkOrderToken):
+    """Work order token for submitting an accession map."""
+
+    work_type: Literal["map"] = "map"
+
+
 # API Request/Response models
 class CreateUploadBoxRequest(BaseModel):
     """Request model for creating a new research data upload box."""
@@ -200,10 +206,14 @@ class AccessionMapRequest(BaseModel):
     """The request body schema for submitting accession maps"""
 
     version: int = Field(
-        ..., description="A counter indicating research data upload box version"
+        default=..., description="A counter indicating research data upload box version"
     )
     mapping: dict[Accession, UUID4] = Field(
         default=..., description="Map of accessions to file IDs"
+    )
+    study_pid: str = Field(
+        default=...,
+        description="Identifier of the study to which the file accessions belong.",
     )
 
 

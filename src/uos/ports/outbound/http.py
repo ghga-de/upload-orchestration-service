@@ -165,7 +165,9 @@ class AccessionClientPort(ABC):
         """Raised when there's an error while communicating with the service."""
 
     @abstractmethod
-    async def submit_accession_map(self, *, accession_map: AccessionMap) -> None:
+    async def submit_accession_map(
+        self, *, accession_map: AccessionMap, study_pid: str, user_id: UUID4
+    ) -> None:
         """Submit a map of accession numbers to file IDs.
 
         Raises:

@@ -698,6 +698,7 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
             "GHGA002": test_file_ids[1],
             "GHGA003": test_file_ids[2],
         },
+        study_pid="GHGA-STUDY-001",
     )
 
     # Verify that a BoxNotFoundError is raised for a non-existent box
@@ -769,7 +770,9 @@ async def test_update_accession_map_invalid_or_unmapped_file_ids(
     # Create an accession map with a file ID that doesn't exist in the box
     invalid_file_id = uuid4()
     accession_map = models.AccessionMapRequest(
-        version=0, mapping={"GHGA001": test_file_ids[0], "GHGA002": invalid_file_id}
+        version=0,
+        mapping={"GHGA001": test_file_ids[0], "GHGA002": invalid_file_id},
+        study_pid="GHGA-STUDY-001",
     )
 
     # Should raise AccessionMapError
@@ -783,7 +786,7 @@ async def test_update_accession_map_invalid_or_unmapped_file_ids(
 
     # Create an accession map that omits a file
     accession_map = models.AccessionMapRequest(
-        version=0, mapping={"GHGA001": test_file_ids[0]}
+        version=0, mapping={"GHGA001": test_file_ids[0]}, study_pid="GHGA-STUDY-001"
     )
 
     # Should raise AccessionMapError
@@ -859,7 +862,9 @@ async def test_update_accession_map_filters_cancelled_and_failed(
 
     # Create an accession map for only the valid files
     request = models.AccessionMapRequest(
-        version=0, mapping={"GHGA001": test_file_ids[0], "GHGA004": test_file_ids[3]}
+        version=0,
+        mapping={"GHGA001": test_file_ids[0], "GHGA004": test_file_ids[3]},
+        study_pid="GHGA-STUDY-001",
     )
 
     # This should succeed because cancelled and failed files are ignored

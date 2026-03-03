@@ -762,6 +762,7 @@ async def test_submit_accession_map(
         request_data = {
             "version": 0,
             "mapping": {"GHGA001": str(uuid4()), "GHGA002": str(uuid4())},
+            "study_pid": "GHGA-STUDY-001",
         }
 
         # unauthenticated

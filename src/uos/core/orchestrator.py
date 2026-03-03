@@ -614,7 +614,11 @@ class UploadOrchestrator(UploadOrchestratorPort):
         return BoxRetrievalResults(count=count, boxes=boxes)
 
     async def update_accession_map(
-        self, *, box_id: UUID4, request: AccessionMapRequest, user_id: UUID4
+        self,
+        *,
+        box_id: UUID4,
+        request: AccessionMapRequest,
+        user_id: UUID4,
     ) -> None:
         """Update the file accession map for a given box and publish an outbox event.
         This results in a version increment for the ResearchDataUploadBox.
@@ -733,7 +737,9 @@ class UploadOrchestrator(UploadOrchestratorPort):
         # Submit the data to the Accession API
         accession_mapping = AccessionMap(box_id=box_id, mapping=request.mapping)
         await self._accession_client.submit_accession_map(
-            accession_map=accession_mapping
+            accession_map=accession_mapping,
+            study_pid=request.study_pid,
+            user_id=user_id,
         )
 
         try:
