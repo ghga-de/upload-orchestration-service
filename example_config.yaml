@@ -25,7 +25,6 @@ enable_opentelemetry: false
 file_upload_box_topic: file-upload-boxes
 generate_correlation_id: true
 host: 127.0.0.1
-work_order_signing_key: '**********'
 kafka_compression_type: null
 kafka_dlq_topic: dlq
 kafka_enable_dlq: false
@@ -52,4 +51,5 @@ service_instance_id: '1'
 service_name: uos
 timeout_keep_alive: 90
 ucs_url: http://127.0.0.1/upload
+work_order_signing_key: '**********'
 workers: 1

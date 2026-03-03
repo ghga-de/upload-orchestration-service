@@ -88,7 +88,7 @@ The service requires the following configuration parameters:
   "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
   ```
 
-- <a id="properties/accession_url"></a>**`accession_url`** *(string, format: uri, required)*: URL pointing to the API of the service that manages accession numbers. Length must be between 1 and 2083 (inclusive).
+- <a id="properties/accession_url"></a>**`accession_url`** *(string, format: uri, required)*: URL pointing to the API of the service that manages accession numbers (currently the study registry service). Length must be between 1 and 2083 (inclusive).
 
   Examples:
   ```json

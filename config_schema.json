@@ -41,12 +41,12 @@
         "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
       ],
       "format": "password",
-      "title": "Jwt Signing Key",
+      "title": "Work Order Signing Key",
       "type": "string",
       "writeOnly": true
     },
     "accession_url": {
-      "description": "URL pointing to the API of the service that manages accession numbers.",
+      "description": "URL pointing to the API of the service that manages accession numbers (currently the study registry service).",
       "examples": [
         "http://127.0.0.1/accessions"
       ],
