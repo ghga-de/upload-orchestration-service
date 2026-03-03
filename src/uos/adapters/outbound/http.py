@@ -53,11 +53,11 @@ from uos.ports.outbound.http import (
 log = logging.getLogger(__name__)
 
 
-class JWTSigningConfig(BaseSettings):
+class WOTSigningConfig(BaseSettings):
     """Base config for JWT use"""
 
     work_order_signing_key: SecretStr = Field(
-        ...,
+        default=...,
         description="The private key for signing work order tokens and other JWTs",
         examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
     )
@@ -67,7 +67,7 @@ class AccessApiConfig(BaseSettings):
     """Config parameters for managing upload access grants."""
 
     access_url: HttpUrl = Field(
-        ...,
+        default=...,
         description="URL pointing to the internal access API.",
         examples=["http://127.0.0.1/access"],
     )
@@ -259,11 +259,11 @@ class AccessClient(AccessClientPort):
             raise self.AccessAPIError("Failed to check box access.") from err
 
 
-class FileBoxClientConfig(JWTSigningConfig):
+class FileBoxClientConfig(WOTSigningConfig):
     """Config parameters for interacting with the service owning FileUploadBoxes."""
 
     ucs_url: HttpUrl = Field(
-        ...,
+        default=...,
         description="URL pointing to the API of the service that owns FileUploadBoxes"
         + " (currently the UCS).",
         examples=["http://127.0.0.1/upload"],
@@ -463,11 +463,11 @@ class FileBoxClient(FileBoxClientPort):
             raise self.OperationError("Failed to archive FileUploadBox.")
 
 
-class AccessionClientConfig(JWTSigningConfig):
+class AccessionClientConfig(WOTSigningConfig):
     """Config parameters for interacting with the service that manages accession numbers."""
 
     accession_url: HttpUrl = Field(
-        ...,
+        default=...,
         description=(
             "URL pointing to the API of the service that manages accession"
             + " numbers (currently the study registry service)."
