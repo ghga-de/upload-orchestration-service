@@ -258,16 +258,17 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     )
 
     # Submit an accession map
+    study_pid = "GHGA-STUDY-001"
     accession_map = AccessionMapRequest(
         version=box_after_lock.version,
         mapping={"GHGA001": file_id_1, "GHGA002": file_id_2, "GHGA003": file_id_3},
-        study_pid="GHGA-STUDY-001",
+        study_pid=study_pid,
     )
     # Mock the endpoint of the Accession API
     accession_url = joint_fixture.config.accession_url
     httpx_mock.add_response(
         method="POST",
-        url=f"{accession_url}/file-ids",
+        url=f"{accession_url}/file-ids/{study_pid}",
         status_code=204,
     )
     await orchestrator.update_accession_map(

@@ -496,7 +496,7 @@ class AccessionClient(AccessionClientPort):
         json_mapping = accession_map.model_dump(mode="json")["mapping"]
         body = {"study_pid": study_pid, "mapping": json_mapping}
         response = await self._client.post(
-            f"{self._accession_url}/file-ids",
+            f"{self._accession_url}/file-ids/{study_pid}",
             headers=self._auth_header(wot),
             json=body,
             timeout=HTTPX_TIMEOUT,
