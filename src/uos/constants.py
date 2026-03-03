@@ -29,7 +29,3 @@ VALID_STATE_TRANSITIONS = [
     ("locked", "open"),
     ("locked", "archived"),
 ]
-AUTH_TOKEN_VALID_SECONDS = 60
-JWT_ISS = "GHGA"
-JWT_AUD = "GHGA"
-JWT_SUB = "AccessionMap"
