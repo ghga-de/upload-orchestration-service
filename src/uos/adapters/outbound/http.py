@@ -56,7 +56,7 @@ log = logging.getLogger(__name__)
 class JWTSigningConfig(BaseSettings):
     """Base config for JWT use"""
 
-    jwt_signing_key: SecretStr = Field(
+    work_order_signing_key: SecretStr = Field(
         ...,
         description="The private key for signing work order tokens and other JWTs",
         examples=['{"crv": "P-256", "kty": "EC", "x": "...", "y": "..."}'],
@@ -279,7 +279,9 @@ class FileBoxClient(FileBoxClientPort):
     def __init__(self, *, config: FileBoxClientConfig, httpx_client: httpx.AsyncClient):
         self._ucs_url = config.ucs_url
         self._client = httpx_client
-        self._signing_key = jwk.JWK.from_json(config.jwt_signing_key.get_secret_value())
+        self._signing_key = jwk.JWK.from_json(
+            config.work_order_signing_key.get_secret_value()
+        )
         if not self._signing_key.has_private:
             key_error = KeyError("No private work order signing key found.")
             log.error(key_error)
@@ -460,7 +462,10 @@ class AccessionClientConfig(JWTSigningConfig):
 
     accession_url: HttpUrl = Field(
         ...,
-        description="URL pointing to the API of the service that manages accession numbers.",
+        description=(
+            "URL pointing to the API of the service that manages accession"
+            + " numbers (currently the study registry service)."
+        ),
         examples=["http://127.0.0.1/accessions"],
     )
 
@@ -473,7 +478,9 @@ class AccessionClient(AccessionClientPort):
     ):
         self._client = httpx_client
         self._accession_url = config.accession_url
-        self._signing_key = JWK.from_json(config.jwt_signing_key.get_secret_value())
+        self._signing_key = JWK.from_json(
+            config.work_order_signing_key.get_secret_value()
+        )
         if not self._signing_key.has_private:
             value_error = ValueError("No private token-signing key found.")
             log.error(value_error)
@@ -497,7 +504,7 @@ class AccessionClient(AccessionClientPort):
         """
         json_mapping = accession_map.model_dump(mode="json")["mapping"]
         response = await self._client.post(
-            f"{self._accession_url}/accession-maps",
+            f"{self._accession_url}/file-ids",
             headers=self._auth_headers(),
             json=json_mapping,
             timeout=HTTPX_TIMEOUT,

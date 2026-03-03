@@ -266,7 +266,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     accession_url = joint_fixture.config.accession_url
     httpx_mock.add_response(
         method="POST",
-        url=f"{accession_url}/accession-maps",
+        url=f"{accession_url}/file-ids",
         status_code=204,
     )
     await orchestrator.update_accession_map(box_id=box_id, request=accession_map)

@@ -25,7 +25,7 @@ enable_opentelemetry: false
 file_upload_box_topic: file-upload-boxes
 generate_correlation_id: true
 host: 127.0.0.1
-jwt_signing_key: '**********'
+work_order_signing_key: '**********'
 kafka_compression_type: null
 kafka_dlq_topic: dlq
 kafka_enable_dlq: false

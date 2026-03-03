@@ -45,8 +45,10 @@ def config_fixture() -> ConfigFixture:
     auth_jwk = jwt_helpers.generate_jwk()
     auth_key = auth_jwk.export(private_key=False)
     signing_jwk = jwt_helpers.generate_jwk()
-    jwt_signing_key = signing_jwk.export_private()
-    config = get_config(auth_key=auth_key, jwt_signing_key=jwt_signing_key)
+    work_order_signing_key = signing_jwk.export_private()
+    config = get_config(
+        auth_key=auth_key, work_order_signing_key=work_order_signing_key
+    )
     return ConfigFixture(config=config, auth_jwk=auth_jwk, signing_jwk=signing_jwk)
 
 

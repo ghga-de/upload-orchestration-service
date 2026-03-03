@@ -35,7 +35,7 @@
       "title": "Audit Record Type",
       "type": "string"
     },
-    "jwt_signing_key": {
+    "work_order_signing_key": {
       "description": "The private key for signing work order tokens and other JWTs",
       "examples": [
         "{\"crv\": \"P-256\", \"kty\": \"EC\", \"x\": \"...\", \"y\": \"...\"}"
@@ -522,7 +522,7 @@
     "file_upload_box_topic",
     "audit_record_topic",
     "audit_record_type",
-    "jwt_signing_key",
+    "work_order_signing_key",
     "accession_url",
     "ucs_url",
     "access_url",

@@ -81,7 +81,7 @@ The service requires the following configuration parameters:
   "audit_record_logged"
   ```
 
-- <a id="properties/jwt_signing_key"></a>**`jwt_signing_key`** *(string, format: password, required and write-only)*: The private key for signing work order tokens and other JWTs.
+- <a id="properties/work_order_signing_key"></a>**`work_order_signing_key`** *(string, format: password, required and write-only)*: The private key for signing work order tokens and other JWTs.
 
   Examples:
   ```json
