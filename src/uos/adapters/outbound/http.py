@@ -27,6 +27,7 @@ from pydantic_settings import BaseSettings
 
 from uos.constants import HTTPX_TIMEOUT
 from uos.core.models import (
+    PID,
     AccessionMap,
     BaseWorkOrderToken,
     ChangeFileBoxWorkOrder,
@@ -483,7 +484,7 @@ class AccessionClient(AccessionClientPort):
         return {"Authorization": f"Bearer {signed_wot}"}
 
     async def submit_accession_map(
-        self, *, accession_map: AccessionMap, study_pid: str, user_id: UUID4
+        self, *, accession_map: AccessionMap, study_pid: PID, user_id: UUID4
     ) -> None:
         """Submit a map of accession numbers to file IDs.
 

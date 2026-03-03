@@ -13,6 +13,8 @@ components:
           type: object
         study_pid:
           description: Identifier of the study to which the file accessions belong.
+          maxLength: 256
+          minLength: 1
           title: Study Pid
           type: string
         version:

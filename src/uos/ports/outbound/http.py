@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from ghga_service_commons.utils.utc_dates import UTCDatetime
 from pydantic import UUID4
 
-from uos.core.models import AccessionMap, FileUploadWithAccession, UploadGrant
+from uos.core.models import PID, AccessionMap, FileUploadWithAccession, UploadGrant
 
 
 class AccessClientPort(ABC):
@@ -162,7 +162,7 @@ class AccessionClientPort(ABC):
 
     @abstractmethod
     async def submit_accession_map(
-        self, *, accession_map: AccessionMap, study_pid: str, user_id: UUID4
+        self, *, accession_map: AccessionMap, study_pid: PID, user_id: UUID4
     ) -> None:
         """Submit a map of accession numbers to file IDs.
 
