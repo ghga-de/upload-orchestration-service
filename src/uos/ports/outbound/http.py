@@ -106,7 +106,9 @@ class FileBoxClientPort(ABC):
         """Raised when the requested version of a FileUploadBox is out of date."""
 
     @abstractmethod
-    async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
+    async def create_file_upload_box(
+        self, *, storage_alias: str, user_id: UUID4
+    ) -> UUID4:
         """Create a new FileUploadBox in owning service.
 
         Raises:
@@ -115,7 +117,7 @@ class FileBoxClientPort(ABC):
         ...
 
     @abstractmethod
-    async def lock_file_upload_box(self, *, box_id: UUID4) -> None:
+    async def lock_file_upload_box(self, *, box_id: UUID4, user_id: UUID4) -> None:
         """Lock a FileUploadBox in the owning service.
 
         Raises:
@@ -124,7 +126,7 @@ class FileBoxClientPort(ABC):
         ...
 
     @abstractmethod
-    async def unlock_file_upload_box(self, *, box_id: UUID4) -> None:
+    async def unlock_file_upload_box(self, *, box_id: UUID4, user_id: UUID4) -> None:
         """Unlock a FileUploadBox in the owning service.
 
         Raises:
@@ -134,7 +136,7 @@ class FileBoxClientPort(ABC):
 
     @abstractmethod
     async def get_file_upload_list(
-        self, *, box_id: UUID4
+        self, *, box_id: UUID4, user_id: UUID4
     ) -> list[FileUploadWithAccession]:
         """Get list of file uploads in a FileUploadBox.
 
@@ -144,7 +146,9 @@ class FileBoxClientPort(ABC):
         ...
 
     @abstractmethod
-    async def archive_file_upload_box(self, *, box_id: UUID4, version: int) -> None:
+    async def archive_file_upload_box(
+        self, *, box_id: UUID4, version: int, user_id: UUID4
+    ) -> None:
         """Archive a FileUploadBox in the owning service.
 
         Raises:

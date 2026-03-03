@@ -292,13 +292,15 @@ class FileBoxClient(FileBoxClientPort):
         headers = {"Authorization": f"Bearer {signed_wot}"}
         return headers
 
-    async def create_file_upload_box(self, *, storage_alias: str) -> UUID4:
+    async def create_file_upload_box(
+        self, *, storage_alias: str, user_id: UUID4
+    ) -> UUID4:
         """Create a new FileUploadBox in owning service.
 
         Raises:
             OperationError if there's a problem with the operation.
         """
-        headers = self._auth_header(CreateFileBoxWorkOrder())
+        headers = self._auth_header(CreateFileBoxWorkOrder(user_id=user_id))
         body = {"storage_alias": storage_alias}
         response = await self._client.post(
             f"{self._ucs_url}/boxes", headers=headers, json=body, timeout=HTTPX_TIMEOUT
@@ -327,13 +329,13 @@ class FileBoxClient(FileBoxClientPort):
             log.error(msg, exc_info=True)
             raise self.OperationError(msg) from err
 
-    async def lock_file_upload_box(self, *, box_id: UUID4) -> None:
+    async def lock_file_upload_box(self, *, box_id: UUID4, user_id: UUID4) -> None:
         """Lock a FileUploadBox in the owning service.
 
         Raises:
             OperationError if there's a problem with the operation.
         """
-        wot = ChangeFileBoxWorkOrder(work_type="lock", box_id=box_id)
+        wot = ChangeFileBoxWorkOrder(work_type="lock", box_id=box_id, user_id=user_id)
         headers = self._auth_header(wot)
         body = {"lock": True}
         response = await self._client.patch(
@@ -353,13 +355,13 @@ class FileBoxClient(FileBoxClientPort):
             )
             raise self.OperationError("Failed to lock FileUploadBox.")
 
-    async def unlock_file_upload_box(self, *, box_id: UUID4) -> None:
+    async def unlock_file_upload_box(self, *, box_id: UUID4, user_id: UUID4) -> None:
         """Unlock a FileUploadBox in the owning service.
 
         Raises:
             OperationError if there's a problem with the operation.
         """
-        wot = ChangeFileBoxWorkOrder(work_type="unlock", box_id=box_id)
+        wot = ChangeFileBoxWorkOrder(work_type="unlock", box_id=box_id, user_id=user_id)
 
         headers = self._auth_header(wot)
         body = {"lock": False}
@@ -381,14 +383,14 @@ class FileBoxClient(FileBoxClientPort):
             raise self.OperationError("Failed to unlock FileUploadBox.")
 
     async def get_file_upload_list(
-        self, *, box_id: UUID4
+        self, *, box_id: UUID4, user_id: UUID4
     ) -> list[FileUploadWithAccession]:
         """Get list of file uploads in a FileUploadBox.
 
         Raises:
             OperationError if there's a problem with the operation.
         """
-        wot = ViewFileBoxWorkOrder(box_id=box_id)
+        wot = ViewFileBoxWorkOrder(box_id=box_id, user_id=user_id)
         headers = self._auth_header(wot)
         response = await self._client.get(
             f"{self._ucs_url}/boxes/{box_id}/uploads",
@@ -415,14 +417,18 @@ class FileBoxClient(FileBoxClientPort):
             log.error(msg, exc_info=True)
             raise self.OperationError(msg) from err
 
-    async def archive_file_upload_box(self, *, box_id: UUID4, version: int) -> None:
+    async def archive_file_upload_box(
+        self, *, box_id: UUID4, version: int, user_id: UUID4
+    ) -> None:
         """Archive a FileUploadBox in the owning service.
 
         Raises:
             FUBVersionError if the remote box version differs from `version`.
             OperationError if there's any other problem with the operation.
         """
-        wot = ChangeFileBoxWorkOrder(work_type="archive", box_id=box_id)
+        wot = ChangeFileBoxWorkOrder(
+            work_type="archive", box_id=box_id, user_id=user_id
+        )
         headers = self._auth_header(wot)
         body = {"version": version}
         response = await self._client.patch(

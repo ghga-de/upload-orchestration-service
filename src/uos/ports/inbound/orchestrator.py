@@ -233,7 +233,7 @@ class UploadOrchestratorPort(ABC):
 
     @abstractmethod
     async def update_accession_map(
-        self, *, box_id: UUID4, request: AccessionMapRequest
+        self, *, box_id: UUID4, request: AccessionMapRequest, user_id: UUID4
     ) -> None:
         """Update the file accession map for a given box and publish an outbox event.
         This results in a version increment for the ResearchDataUploadBox.

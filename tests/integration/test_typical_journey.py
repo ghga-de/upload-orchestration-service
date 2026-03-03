@@ -269,7 +269,9 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         url=f"{accession_url}/file-ids",
         status_code=204,
     )
-    await orchestrator.update_accession_map(box_id=box_id, request=accession_map)
+    await orchestrator.update_accession_map(
+        box_id=box_id, request=accession_map, user_id=ds_user_id
+    )
 
     # Make sure the RDUB version was bumped by the accession map update
     box_after_mapping = await orchestrator.get_research_data_upload_box(

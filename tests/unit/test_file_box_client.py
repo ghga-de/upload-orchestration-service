@@ -38,19 +38,26 @@ async def test_create_file_upload_box(
     file_upload_box_client = FileBoxClient(
         config=config.config, httpx_client=httpx_client
     )
+    test_user_id = uuid4()
     httpx_mock.add_response(201, json=str(TEST_BOX_ID))
-    box_id = await file_upload_box_client.create_file_upload_box(storage_alias="HD01")
+    box_id = await file_upload_box_client.create_file_upload_box(
+        storage_alias="HD01", user_id=test_user_id
+    )
     assert box_id == TEST_BOX_ID, "Failed happy path"
 
     # Check off-normal status code
     httpx_mock.add_response(500, json="Some error occurred.")
     with pytest.raises(FileBoxClient.OperationError):
-        await file_upload_box_client.create_file_upload_box(storage_alias="HD01")
+        await file_upload_box_client.create_file_upload_box(
+            storage_alias="HD01", user_id=test_user_id
+        )
 
     # Check with successful status code but garbled response body
     httpx_mock.add_response(201, json="id123")
     with pytest.raises(FileBoxClient.OperationError):
-        await file_upload_box_client.create_file_upload_box(storage_alias="HD01")
+        await file_upload_box_client.create_file_upload_box(
+            storage_alias="HD01", user_id=test_user_id
+        )
 
 
 async def test_lock_file_upload_box(
@@ -60,15 +67,18 @@ async def test_lock_file_upload_box(
     file_upload_box_client = FileBoxClient(
         config=config.config, httpx_client=httpx_client
     )
+    test_user_id = uuid4()
     httpx_mock.add_response(204)
     await file_upload_box_client.lock_file_upload_box(
-        box_id=TEST_BOX_ID
+        box_id=TEST_BOX_ID, user_id=test_user_id
     )  # no error == success
 
     # Check off-normal status code
     httpx_mock.add_response(500, json="Some error occurred.")
     with pytest.raises(FileBoxClient.OperationError):
-        await file_upload_box_client.lock_file_upload_box(box_id=TEST_BOX_ID)
+        await file_upload_box_client.lock_file_upload_box(
+            box_id=TEST_BOX_ID, user_id=test_user_id
+        )
 
 
 async def test_unlock_file_upload_box(
@@ -78,15 +88,18 @@ async def test_unlock_file_upload_box(
     file_upload_box_client = FileBoxClient(
         config=config.config, httpx_client=httpx_client
     )
+    test_user_id = uuid4()
     httpx_mock.add_response(204)
     await file_upload_box_client.unlock_file_upload_box(
-        box_id=TEST_BOX_ID
+        box_id=TEST_BOX_ID, user_id=test_user_id
     )  # no error == success
 
     # Check off-normal status code
     httpx_mock.add_response(500, json="Some error occurred.")
     with pytest.raises(FileBoxClient.OperationError):
-        await file_upload_box_client.unlock_file_upload_box(box_id=TEST_BOX_ID)
+        await file_upload_box_client.unlock_file_upload_box(
+            box_id=TEST_BOX_ID, user_id=test_user_id
+        )
 
 
 async def test_get_file_upload_list(
@@ -111,23 +124,32 @@ async def test_get_file_upload_list(
         )
         for i in range(3)
     ]
+    test_user_id = uuid4()
     httpx_mock.add_response(
         200, json=[x.model_dump(mode="json") for x in file_list_response]
     )
-    file_list = await file_upload_box_client.get_file_upload_list(box_id=TEST_BOX_ID)
+    file_list = await file_upload_box_client.get_file_upload_list(
+        box_id=TEST_BOX_ID, user_id=test_user_id
+    )
     assert file_list == file_list_response
 
     # Check off-normal status code
     httpx_mock.add_response(500, json="Some error occurred.")
     with pytest.raises(FileBoxClient.OperationError):
-        await file_upload_box_client.get_file_upload_list(box_id=TEST_BOX_ID)
+        await file_upload_box_client.get_file_upload_list(
+            box_id=TEST_BOX_ID, user_id=test_user_id
+        )
 
     # Check with successful status code but garbled response body
     httpx_mock.add_response(200, json="id123")
     with pytest.raises(FileBoxClient.OperationError):
-        await file_upload_box_client.get_file_upload_list(box_id=TEST_BOX_ID)
+        await file_upload_box_client.get_file_upload_list(
+            box_id=TEST_BOX_ID, user_id=test_user_id
+        )
 
     # Check with empty list response
     httpx_mock.add_response(200, json=[])
-    file_list = await file_upload_box_client.get_file_upload_list(box_id=TEST_BOX_ID)
+    file_list = await file_upload_box_client.get_file_upload_list(
+        box_id=TEST_BOX_ID, user_id=test_user_id
+    )
     assert file_list == []

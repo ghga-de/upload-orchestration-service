@@ -702,7 +702,9 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
 
     # Verify that a BoxNotFoundError is raised for a non-existent box
     with pytest.raises(rig.controller.BoxNotFoundError):
-        await rig.controller.update_accession_map(box_id=uuid4(), request=accession_map)
+        await rig.controller.update_accession_map(
+            box_id=uuid4(), request=accession_map, user_id=TEST_DS_ID
+        )
 
     # Verify that the accession client was not called
     rig.accession_client.submit_accession_map.assert_not_called()  # type: ignore
@@ -715,7 +717,9 @@ async def test_update_accession_map_happy(rig: JointRig, populated_boxes: list[U
     version_pre_update = box.version
 
     # Call the method with the valid map now
-    await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
+    await rig.controller.update_accession_map(
+        box_id=box_id, request=accession_map, user_id=TEST_DS_ID
+    )
 
     # Verify the accession map was stored
     stored_map = await rig.accession_map_dao.get_by_id(box_id)
@@ -770,7 +774,9 @@ async def test_update_accession_map_invalid_or_unmapped_file_ids(
 
     # Should raise AccessionMapError
     with pytest.raises(rig.controller.AccessionMapError, match="not in the box"):
-        await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
+        await rig.controller.update_accession_map(
+            box_id=box_id, request=accession_map, user_id=TEST_DS_ID
+        )
 
     # Verify file box client was called
     rig.file_upload_box_client.get_file_upload_list.assert_called_once()  # type: ignore
@@ -784,7 +790,9 @@ async def test_update_accession_map_invalid_or_unmapped_file_ids(
     with pytest.raises(
         rig.controller.AccessionMapError, match="still need to be mapped"
     ):
-        await rig.controller.update_accession_map(box_id=box_id, request=accession_map)
+        await rig.controller.update_accession_map(
+            box_id=box_id, request=accession_map, user_id=TEST_DS_ID
+        )
 
 
 async def test_update_accession_map_filters_cancelled_and_failed(
@@ -855,7 +863,9 @@ async def test_update_accession_map_filters_cancelled_and_failed(
     )
 
     # This should succeed because cancelled and failed files are ignored
-    await rig.controller.update_accession_map(box_id=box_id, request=request)
+    await rig.controller.update_accession_map(
+        box_id=box_id, request=request, user_id=TEST_DS_ID
+    )
 
     # Verify the accession map was stored
     stored_map = await rig.accession_map_dao.get_by_id(box_id)

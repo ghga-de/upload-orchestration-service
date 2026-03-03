@@ -77,6 +77,7 @@ class BaseWorkOrderToken(BaseModel):
     """Base model for work order tokens."""
 
     work_type: str
+    user_id: UUID4
     model_config = ConfigDict(frozen=True)
 
 
