@@ -105,6 +105,7 @@ class SubmitAccessionMapWorkOrder(BaseWorkOrderToken):
 
     work_type: Literal["map"] = "map"
     user_id: UUID4
+    study_pid: str
 
 
 # API Request/Response models

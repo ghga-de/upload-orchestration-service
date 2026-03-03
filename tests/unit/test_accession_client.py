@@ -47,6 +47,7 @@ class WOTClaimsModel(BaseModel):
 
     work_type: Literal["map"]
     user_id: UUID4
+    study_pid: str
     iat: UTCDatetime
     exp: UTCDatetime
 
@@ -81,7 +82,9 @@ async def test_wot_formation(
     """
     auth_config = JWTAuthConfig(
         auth_key=config.signing_jwk.export_public(),
-        auth_check_claims=dict.fromkeys(["work_type", "user_id", "iat", "exp"]),
+        auth_check_claims=dict.fromkeys(
+            ["work_type", "user_id", "study_pid", "iat", "exp"]
+        ),
     )
     auth_context_provider = JWTAuthContextProvider(
         config=auth_config, context_class=WOTClaimsModel
@@ -95,6 +98,7 @@ async def test_wot_formation(
         assert context
         assert context.work_type == "map"
         assert context.user_id == test_user_id
+        assert context.study_pid == TEST_STUDY_PID
         assert context.iat - now_utc_ms_prec() < timedelta(seconds=3)
         body = json.loads(request.content)
         assert body["study_pid"] == TEST_STUDY_PID

@@ -492,7 +492,7 @@ class AccessionClient(AccessionClientPort):
         Raises:
             OperationError: if there's a problem during the operation.
         """
-        wot = SubmitAccessionMapWorkOrder(user_id=user_id)
+        wot = SubmitAccessionMapWorkOrder(user_id=user_id, study_pid=study_pid)
         json_mapping = accession_map.model_dump(mode="json")["mapping"]
         body = {"study_pid": study_pid, "mapping": json_mapping}
         response = await self._client.post(
