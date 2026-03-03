@@ -98,7 +98,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         """
         # Create FileUploadBox in external service
         file_upload_box_id = await self._file_upload_box_client.create_file_upload_box(
-            storage_alias=storage_alias, user_id=data_steward_id
+            storage_alias=storage_alias
         )
 
         # Create ResearchDataUploadBox
@@ -197,9 +197,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Take the appropriate action for the state change and roll back if it fails
         try:
-            await self._handle_state_change(
-                old_box=box, updated_box=updated_box, user_id=user_id
-            )
+            await self._handle_state_change(old_box=box, updated_box=updated_box)
         except Exception:
             log.warning(
                 "Failed to update FUB %s, rolling back changes for RDUB %s",
@@ -229,7 +227,6 @@ class UploadOrchestrator(UploadOrchestratorPort):
         *,
         old_box: ResearchDataUploadBox,
         updated_box: ResearchDataUploadBox,
-        user_id: UUID4,
     ) -> None:
         """Handle state change for a Research Data Upload Box and the corresponding
         FileUploadBox.
@@ -238,23 +235,18 @@ class UploadOrchestrator(UploadOrchestratorPort):
         fub_id = updated_box.file_upload_box_id
         match (old_box.state, updated_box.state):
             case ("open", "locked"):  # lock the box
-                await self._file_upload_box_client.lock_file_upload_box(
-                    box_id=fub_id, user_id=user_id
-                )
+                await self._file_upload_box_client.lock_file_upload_box(box_id=fub_id)
             case ("locked", "open"):  # unlock the box
-                await self._file_upload_box_client.unlock_file_upload_box(
-                    box_id=fub_id, user_id=user_id
-                )
+                await self._file_upload_box_client.unlock_file_upload_box(box_id=fub_id)
             case ("locked", "archived"):  # archive the box
                 # Check prerequisites using old version number for logging purposes
-                await self._check_archival_prerequisites(box=old_box, user_id=user_id)
+                await self._check_archival_prerequisites(box=old_box)
 
                 # Use old box data because `updated_box` has already been, well, updated
                 try:
                     await self._file_upload_box_client.archive_file_upload_box(
                         box_id=fub_id,
                         version=old_box.file_upload_box_version,
-                        user_id=user_id,
                     )
                 except FileBoxClientPort.FUBVersionError as version_err:
                     log.error(
@@ -275,7 +267,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
                 raise NotImplementedError()
 
     async def _check_archival_prerequisites(
-        self, *, box: ResearchDataUploadBox, user_id: UUID4
+        self, *, box: ResearchDataUploadBox
     ) -> None:
         """Archive a research data upload box.
 
@@ -300,7 +292,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Get files list from File Box API - this always gets the latest data
         files = await self._file_upload_box_client.get_file_upload_list(
-            box_id=box.file_upload_box_id, user_id=user_id
+            box_id=box.file_upload_box_id
         )
 
         # Make sure all files have an accession number
@@ -449,9 +441,8 @@ class UploadOrchestrator(UploadOrchestratorPort):
         )
 
         # Get file list from file box service
-        user_id = UUID(auth_context.id)
         file_uploads = await self._file_upload_box_client.get_file_upload_list(
-            box_id=upload_box.file_upload_box_id, user_id=user_id
+            box_id=upload_box.file_upload_box_id
         )
 
         # Get accessions from database
@@ -696,7 +687,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
 
         # Get files list from File Box API
         files = await self._file_upload_box_client.get_file_upload_list(
-            box_id=box.file_upload_box_id, user_id=user_id
+            box_id=box.file_upload_box_id
         )
 
         # Make sure all specified file IDs are active uploads in the box

@@ -77,7 +77,6 @@ class BaseWorkOrderToken(BaseModel):
     """Base model for work order tokens."""
 
     work_type: str
-    user_id: UUID4
     model_config = ConfigDict(frozen=True)
 
 
@@ -105,6 +104,7 @@ class SubmitAccessionMapWorkOrder(BaseWorkOrderToken):
     """Work order token for submitting an accession map."""
 
     work_type: Literal["map"] = "map"
+    user_id: UUID4
 
 
 # API Request/Response models
