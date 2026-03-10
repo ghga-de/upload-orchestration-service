@@ -82,8 +82,10 @@ class AccessClient(AccessClientPort):
         box_id: UUID4,
         valid_from: UTCDatetime,
         valid_until: UTCDatetime,
-    ) -> None:
+    ) -> UUID4:
         """Grant upload access to a user for a box.
+
+        Returns the created grant ID.
 
         Raises:
             AccessAPIError: if there's a problem during the operation.
@@ -114,6 +116,12 @@ class AccessClient(AccessClientPort):
                 },
             )
             raise self.AccessAPIError("Failed to grant upload access.")
+        try:
+            return UUID(response.json())
+        except Exception as err:
+            msg = "Failed to extract the ID of the newly created access grant from the response body."
+            log.error(msg, exc_info=True)
+            raise self.AccessAPIError(msg) from err
 
     async def revoke_upload_access(self, *, grant_id: UUID4) -> None:
         """Revoke a user's access to an upload box.

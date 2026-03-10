@@ -41,8 +41,10 @@ class AccessClientPort(ABC):
         box_id: UUID4,
         valid_from: UTCDatetime,
         valid_until: UTCDatetime,
-    ) -> None:
+    ) -> UUID4:
         """Grant upload access to a user for a box.
+
+        Returns the created grant ID.
 
         Raises:
             AccessAPIError: if there's a problem during the operation.

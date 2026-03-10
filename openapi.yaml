@@ -511,7 +511,10 @@ paths:
         '201':
           content:
             application/json:
-              schema: {}
+              schema:
+                format: uuid4
+                title: Response Grant Upload Access Access Grants Post
+                type: string
           description: Upload access granted successfully.
         '401':
           description: Not authenticated.

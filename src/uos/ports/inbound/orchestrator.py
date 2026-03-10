@@ -131,8 +131,10 @@ class UploadOrchestratorPort(ABC):
         valid_from: UTCDatetime,
         valid_until: UTCDatetime,
         granting_user_id: UUID4,
-    ) -> None:
+    ) -> UUID4:
         """Grant upload access to a user for a specific research data upload box.
+
+        Returns the created grant ID.
 
         Raises:
             AccessAPIError: if there's a problem communicating with the access API.

@@ -327,8 +327,10 @@ class UploadOrchestrator(UploadOrchestratorPort):
         valid_from: UTCDatetime,
         valid_until: UTCDatetime,
         granting_user_id: UUID4,
-    ) -> None:
+    ) -> UUID4:
         """Grant upload access to a user for a specific research data upload box.
+
+        Returns the created grant ID.
 
         Raises:
             AccessAPIError: if there's a problem communicating with the access API.
@@ -339,7 +341,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         await self._box_dao.get_by_id(box_id)
 
         # Grant access via Claims Repository Service (errors handled by access client)
-        await self._access_client.grant_upload_access(
+        grant_id = await self._access_client.grant_upload_access(
             user_id=user_id,
             iva_id=iva_id,
             box_id=box_id,
@@ -352,6 +354,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         log.info(
             "Access grant operation successful for user %s and box %s", user_id, box_id
         )
+        return grant_id
 
     async def revoke_upload_access_grant(self, grant_id: UUID4) -> None:
         """Revoke a user's access to an upload box.
