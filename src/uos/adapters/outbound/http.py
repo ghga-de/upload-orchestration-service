@@ -72,6 +72,7 @@ class AccessClient(AccessClientPort):
 
     def __init__(self, *, config: AccessApiConfig, httpx_client: httpx.AsyncClient):
         self._access_url = config.access_url
+        self._access_url = str(config.access_url).rstrip("/")
         self._client = httpx_client
 
     async def grant_upload_access(
