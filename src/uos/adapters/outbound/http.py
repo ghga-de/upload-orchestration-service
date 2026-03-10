@@ -273,6 +273,7 @@ class FileBoxClient(FileBoxClientPort):
 
     def __init__(self, *, config: FileBoxClientConfig, httpx_client: httpx.AsyncClient):
         self._ucs_url = config.ucs_url
+        self._ucs_url = str(config.ucs_url).rstrip("/")
         self._client = httpx_client
         self._signing_key = jwk.JWK.from_json(
             config.work_order_signing_key.get_secret_value()
