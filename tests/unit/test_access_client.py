@@ -43,7 +43,7 @@ async def test_grant_upload_access(
 
     # Happy path
     test_grant_id = uuid4()
-    httpx_mock.add_response(204, json=str(test_grant_id))
+    httpx_mock.add_response(201, json=str(test_grant_id))
     result = await access_client.grant_upload_access(
         user_id=TEST_USER_ID,
         iva_id=TEST_IVA_ID,
@@ -54,7 +54,7 @@ async def test_grant_upload_access(
     assert result == test_grant_id
 
     # Check bad response body (not a valid UUID)
-    httpx_mock.add_response(204, json="not-a-uuid")
+    httpx_mock.add_response(201, json="not-a-uuid")
     with pytest.raises(AccessClient.AccessAPIError):
         await access_client.grant_upload_access(
             user_id=TEST_USER_ID,

@@ -106,7 +106,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
     httpx_mock.add_response(
         method="POST",
         url=f"{access_url}/upload-access/users/{regular_user_id}/ivas/{iva_id}/boxes/{box_id}",
-        status_code=204,
+        status_code=201,
         json=str(test_grant_id),
     )
     valid_from = now_utc_ms_prec()
