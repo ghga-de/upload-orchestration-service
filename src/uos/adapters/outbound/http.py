@@ -98,7 +98,7 @@ class AccessClient(AccessClientPort):
         }
 
         response = await self._client.post(url, json=body, timeout=HTTPX_TIMEOUT)
-        if response.status_code != 200:
+        if response.status_code != 204:
             log.error(
                 "Failed to grant upload access for user %s to box %s.",
                 user_id,
