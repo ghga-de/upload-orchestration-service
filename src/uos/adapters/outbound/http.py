@@ -117,7 +117,7 @@ class AccessClient(AccessClientPort):
             )
             raise self.AccessAPIError("Failed to grant upload access.")
         try:
-            return UUID(response.json())
+            return UUID(response.json()["id"])
         except Exception as err:
             msg = "Failed to extract the ID of the newly created access grant from the response body."
             log.error(msg, exc_info=True)
