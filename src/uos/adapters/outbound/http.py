@@ -33,6 +33,7 @@ from uos.core.models import (
     ChangeFileBoxWorkOrder,
     CreateFileBoxWorkOrder,
     FileUploadWithAccession,
+    GrantId,
     SubmitAccessionMapWorkOrder,
     UploadGrant,
     ViewFileBoxWorkOrder,
@@ -82,7 +83,7 @@ class AccessClient(AccessClientPort):
         box_id: UUID4,
         valid_from: UTCDatetime,
         valid_until: UTCDatetime,
-    ) -> UUID4:
+    ) -> GrantId:
         """Grant upload access to a user for a box.
 
         Returns the created grant ID.
@@ -117,7 +118,7 @@ class AccessClient(AccessClientPort):
             )
             raise self.AccessAPIError("Failed to grant upload access.")
         try:
-            return UUID(response.json()["id"])
+            return GrantId(id=response.json()["id"])
         except Exception as err:
             msg = "Failed to extract the ID of the newly created access grant from the response body."
             log.error(msg, exc_info=True)

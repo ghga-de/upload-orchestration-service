@@ -184,6 +184,18 @@ components:
       - box_id
       title: GrantAccessRequest
       type: object
+    GrantId:
+      description: The ID of an access grant.
+      properties:
+        id:
+          description: Internal grant ID (same as claim ID)
+          format: uuid4
+          title: Id
+          type: string
+      required:
+      - id
+      title: GrantId
+      type: object
     GrantWithBoxInfo:
       description: An UploadGrant with the ResearchDataUploadBox title and description.
       properties:
@@ -512,9 +524,7 @@ paths:
           content:
             application/json:
               schema:
-                format: uuid4
-                title: Response Grant Upload Access Access Grants Post
-                type: string
+                $ref: '#/components/schemas/GrantId'
           description: Upload access granted successfully.
         '401':
           description: Not authenticated.

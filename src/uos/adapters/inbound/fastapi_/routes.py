@@ -38,6 +38,7 @@ from uos.core.models import (
     CreateUploadBoxRequest,
     FileUploadWithAccession,
     GrantAccessRequest,
+    GrantId,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
@@ -146,7 +147,7 @@ async def get_research_data_upload_box(
     box_id: UUID,
     upload_service: UploadOrchestratorDummy,
     auth_context: UserAuthContext,
-):
+) -> ResearchDataUploadBox:
     """Get details of a specific upload box. If the user doesn't have access to an
     existing box, this endpoint will return a 404.
     """
@@ -270,7 +271,7 @@ async def grant_upload_access(
     request: GrantAccessRequest,
     upload_service: UploadOrchestratorDummy,
     auth_context: StewardAuthContext,
-) -> UUID4:
+) -> GrantId:
     """Grant upload access to a user. Requires Data Steward role."""
     try:
         return await upload_service.grant_upload_access(

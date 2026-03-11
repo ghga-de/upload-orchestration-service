@@ -26,6 +26,7 @@ from uos.core.models import (
     BoxRetrievalResults,
     FileUploadBox,
     FileUploadWithAccession,
+    GrantId,
     GrantWithBoxInfo,
     ResearchDataUploadBox,
     UpdateUploadBoxRequest,
@@ -131,7 +132,7 @@ class UploadOrchestratorPort(ABC):
         valid_from: UTCDatetime,
         valid_until: UTCDatetime,
         granting_user_id: UUID4,
-    ) -> UUID4:
+    ) -> GrantId:
         """Grant upload access to a user for a specific research data upload box.
 
         Returns the created grant ID.

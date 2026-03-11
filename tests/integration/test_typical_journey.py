@@ -25,7 +25,7 @@ from hexkit.utils import now_utc_ms_prec
 from pytest_httpx import HTTPXMock
 
 from tests.fixtures.joint import JointFixture
-from uos.core.models import AccessionMapRequest, UpdateUploadBoxRequest
+from uos.core.models import AccessionMapRequest, GrantId, UpdateUploadBoxRequest
 
 pytestmark = pytest.mark.asyncio
 
@@ -119,7 +119,7 @@ async def test_typical_journey(joint_fixture: JointFixture, httpx_mock: HTTPXMoc
         valid_until=valid_until,
         granting_user_id=ds_user_id,
     )
-    assert grant_id == test_grant_id
+    assert grant_id == GrantId(id=test_grant_id)
 
     # Update the title or description of the box by a DS (this bumps version to 1)
     update_request = UpdateUploadBoxRequest(

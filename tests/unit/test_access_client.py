@@ -25,6 +25,7 @@ from pytest_httpx import HTTPXMock
 
 from tests.fixtures import ConfigFixture
 from uos.adapters.outbound.http import AccessClient
+from uos.core.models import GrantId
 
 pytestmark = pytest.mark.asyncio
 
@@ -51,7 +52,7 @@ async def test_grant_upload_access(
         valid_from=VALID_FROM,
         valid_until=VALID_UNTIL,
     )
-    assert result == test_grant_id
+    assert result == GrantId(id=test_grant_id)
 
     # Check bad response body (not a valid UUID)
     httpx_mock.add_response(201, json={"id": "not-a-uuid"})
