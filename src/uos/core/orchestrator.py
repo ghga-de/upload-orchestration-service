@@ -301,7 +301,7 @@ class UploadOrchestrator(UploadOrchestratorPort):
         )
 
         # Make sure all files have an accession number
-        file_ids_in_box = set(f.id for f in files)
+        file_ids_in_box = {f.id for f in files}
         file_ids_in_map = set(db_map.mapping.values())
         unassigned_files = file_ids_in_box - file_ids_in_map
 
@@ -699,9 +699,9 @@ class UploadOrchestrator(UploadOrchestratorPort):
         )
 
         # Make sure all specified file IDs are active uploads in the box
-        file_ids_in_box = set(
+        file_ids_in_box = {
             f.id for f in files if f.state not in ("cancelled", "failed")
-        )
+        }
         if invalid_ids := (unique_file_ids - file_ids_in_box):
             log.error(
                 "Accession map for box %s included unknown file IDs.",
