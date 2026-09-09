@@ -138,17 +138,16 @@ class AccessClient(AccessClientPort):
 
         if response.status_code == 404:
             raise self.GrantNotFoundError()
-        else:
-            log.error(
-                "Failed to revoke upload access for grant ID %s.",
-                grant_id,
-                extra={
-                    "grant_id": grant_id,
-                    "status_code": response.status_code,
-                    "response_text": response.text,
-                },
-            )
-            raise self.AccessAPIError("Failed to revoke upload access.")
+        log.error(
+            "Failed to revoke upload access for grant ID %s.",
+            grant_id,
+            extra={
+                "grant_id": grant_id,
+                "status_code": response.status_code,
+                "response_text": response.text,
+            },
+        )
+        raise self.AccessAPIError("Failed to revoke upload access.")
 
     async def get_upload_access_grants(
         self,
@@ -185,8 +184,7 @@ class AccessClient(AccessClientPort):
             raise self.AccessAPIError(msg)
 
         try:
-            grants = [UploadGrant.model_validate(**grant) for grant in response.json()]
-            return grants
+            return [UploadGrant.model_validate(**grant) for grant in response.json()]
         except Exception as err:
             msg = "Failed to extract grant information from response."
             log.error(msg, exc_info=True, extra=params)
@@ -203,7 +201,7 @@ class AccessClient(AccessClientPort):
         status_code = response.status_code
         if status_code == httpx.codes.NOT_FOUND:
             return []
-        elif status_code != httpx.codes.OK:
+        if status_code != httpx.codes.OK:
             log.error(
                 "Failed to retrieve list of research data upload boxes accessible to"
                 + " user %s from the access API.",
@@ -359,7 +357,7 @@ class FileBoxClient(FileBoxClientPort):
             raise self.FUBVersionError(
                 "Requested FileUploadBox version is out of date."
             )
-        elif response.status_code != 204:
+        if response.status_code != 204:
             log.error(
                 "Error locking FileUploadBox ID %s in external service.",
                 box_id,
@@ -401,7 +399,7 @@ class FileBoxClient(FileBoxClientPort):
             raise self.FUBVersionError(
                 "Requested FileUploadBox version is out of date."
             )
-        elif response.status_code != 204:
+        if response.status_code != 204:
             log.error(
                 "Error unlocking FileUploadBox ID %s in external service.",
                 box_id,
@@ -477,7 +475,7 @@ class FileBoxClient(FileBoxClientPort):
             raise self.FUBVersionError(
                 "Requested FileUploadBox version is out of date."
             )
-        elif response.status_code != 204:
+        if response.status_code != 204:
             log.error(
                 "Error archiving FileUploadBox ID %s in external service.",
                 box_id,
@@ -552,5 +550,4 @@ class AccessionClient(AccessionClientPort):
                 },
             )
             raise self.OperationError("Failed to submit accession map.")
-        else:
-            log.info("Submitted accession map for box %s.", accession_map.box_id)
+        log.info("Submitted accession map for box %s.", accession_map.box_id)
