@@ -3,6 +3,13 @@
 
 # Upload Orchestration Service
 
+> [!IMPORTANT]
+> **This repository is archived and no longer maintained.**
+>
+> Its functionality has been taken over by the GHGA Registry Service, which is now maintained in the [GHGA monorepo](https://github.com/ghga-de/ghga) under [`services/ghga-registry-service`](https://github.com/ghga-de/ghga/tree/main/services/ghga-registry-service). Please open issues and pull requests there.
+>
+> This repository is kept read-only for its history. The documentation below describes the state of the code at the time of archival.
+
 Upload Orchestration Service - A service providing a web-accessible management and auth layer over upload-path file services.
 
 ## Description
